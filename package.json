@@ -29,8 +29,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "bin": {
+    "gear-host": "dist/bin/host.js"
+  }
 }
