@@ -6,7 +6,7 @@
 // 作らないため (pin runtime.not_a_daemon_core / pin ui.transport_core_in_process)。
 //
 // 環境変数:
-//   GEAR_STATE_DIR  状態の置き場所。既定 ./var。FIFO は <STATE_DIR>/intake。
+//   GEAR_STATE_DIR  状態の置き場所 (必須)。FIFO は <STATE_DIR>/intake。
 //                   release の中には書かない (release は不変で、世代で捨てられる)。
 // ==================================================================
 import { mkdirSync, existsSync, createReadStream, appendFileSync } from 'node:fs';
@@ -15,7 +15,10 @@ import { join } from 'node:path';
 import { Host, type HostEvent } from '../host.js';
 import { Registry } from '../program.js';
 
-const stateDir = process.env.GEAR_STATE_DIR ?? join(process.cwd(), 'var');
+const stateDir = process.env.GEAR_STATE_DIR;
+if (stateDir === undefined || stateDir.length === 0) {
+  throw new Error('GEAR_STATE_DIR is required and must point outside the release directory');
+}
 const fifo = join(stateDir, 'intake');
 const logFile = join(stateDir, 'host.log');
 
@@ -41,7 +44,7 @@ record({ kind: 'starting', stateDir, fifo, programs: 0, pid: process.pid });
 async function serve(): Promise<void> {
   for (;;) {
     const io = createReadStream(fifo, { encoding: 'utf8' });
-    const host = new Host({ io, programs, report: record });
+    const host = new Host({ io, programs, stateDir, report: record });
     const stop = (): void => host.stop();
     process.once('SIGTERM', stop);
     process.once('SIGINT', stop);

@@ -82,6 +82,13 @@ export class Intake {
   readonly #queue: Submission[] = [];
   #issued = 0;
 
+  constructor(pending: Iterable<Submission> = []) {
+    for (const submission of pending) {
+      this.#queue.push(submission);
+      this.#issued = Math.max(this.#issued, submission.ticket);
+    }
+  }
+
   offer(options: SubmissionOptions): Submission {
     this.#issued += 1;
     const seed = options.seed ?? this.#issued;

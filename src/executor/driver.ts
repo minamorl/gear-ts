@@ -15,7 +15,7 @@ import type { VerdictValue } from '../admission/verdict.js';
 import { Clock, CLOCK_RANDOM_TAG, ClockRandomPayload } from '../clock/index.js';
 import type { Tick } from '../clock/tick.js';
 import type { Kit } from '../kit.js';
-import type { Log } from '../journal.js';
+import type { EntrySink, Log } from '../journal.js';
 import { normalizeJson } from '../json.js';
 import type { Registry } from '../port/core.js';
 import { PROGRAM_SUBMIT_TAG } from '../tags.js';
@@ -48,7 +48,7 @@ export class Driver {
   readonly #real: Darkcore.AsyncHandlerMap;
   readonly #replay: Replay;
   readonly #maxEffects: number | null;
-  readonly #recorder = new Recorder();
+  readonly #recorder: Recorder;
   #processed = 0;
 
   constructor(options: {
@@ -59,6 +59,7 @@ export class Driver {
     readonly maxEffects: number | null;
     readonly kit: Kit | null;
     readonly programs: ProgramRegistry;
+    readonly journalSink?: EntrySink;
   }) {
     this.#clock = options.clock;
     this.#kit = options.kit;
@@ -68,6 +69,7 @@ export class Driver {
     this.#real = options.registry.realHandlers();
     this.#replay = new Replay(options.replaySource, options.registry);
     this.#maxEffects = options.maxEffects;
+    this.#recorder = new Recorder(options.journalSink);
   }
 
   async run(program: BerylxNode, focus: unknown): Promise<Outcome> {

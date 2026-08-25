@@ -25,6 +25,8 @@ export interface HostOptions {
   readonly io: NodeJS.ReadableStream;
   /** 走らせられる program。乗客が居なければ空で良い (何も受け付けない機械になる)。 */
   readonly programs: ProgramRegistry;
+  /** Machine ledger and per-ticket journals live below this directory when provided. */
+  readonly stateDir?: string;
   /** 1 回の drain で処理する上限。null なら受付列が空になるまで。 */
   readonly drainLimit?: number | null;
   /** 進捗の報告先。既定は無音。 */
@@ -65,7 +67,7 @@ export class Host {
   #stopping = false;
 
   constructor(options: HostOptions) {
-    this.machine = new Machine({ programs: options.programs });
+    this.machine = new Machine({ programs: options.programs, stateDir: options.stateDir });
     this.#feed = new Feed({ io: options.io, machine: this.machine });
     this.#drainLimit = options.drainLimit ?? null;
     this.#report = options.report ?? (() => {});
@@ -83,6 +85,8 @@ export class Host {
    * 投入した順と走った順の対応が journal から読み取りにくくなるため。
    */
   async run(): Promise<{ readonly accepted: number; readonly completed: number }> {
+    // A previous process may have durably accepted an item before it could pick it up.
+    await this.#drain();
     while (!this.#stopping) {
       const before = this.#feed.rejected.length;
       const submissions = await this.#feed.absorb({ limit: 1 });

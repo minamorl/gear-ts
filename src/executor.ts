@@ -2,7 +2,7 @@ import { ControlSignal, Focus, type BerylxNode, type Result } from '@minamorl/be
 import type { Policy } from './admission/policy.js';
 import type { Denied } from './admission/verdict.js';
 import { Clock, type RunSeed } from './clock/index.js';
-import { Log } from './journal.js';
+import { Log, type EntrySink } from './journal.js';
 import { Kit } from './kit.js';
 import { Registry as ProgramRegistry } from './program.js';
 import { registry as defaultRegistry, type Registry as PortRegistry } from './port/core.js';
@@ -66,6 +66,7 @@ export interface RunOptions {
   readonly maxEffects?: number | null;
   readonly kit?: Kit | null;
   readonly programs?: ProgramRegistry;
+  readonly journalSink?: EntrySink;
 }
 
 export async function run(program: BerylxNode, options: RunOptions): Promise<Outcome> {
@@ -79,6 +80,7 @@ export async function run(program: BerylxNode, options: RunOptions): Promise<Out
     maxEffects: options.maxEffects ?? null,
     kit,
     programs: options.programs ?? new ProgramRegistry(),
+    journalSink: options.journalSink,
   }).run(program, focus);
 }
 

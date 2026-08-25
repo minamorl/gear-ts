@@ -90,6 +90,18 @@ export class Entry {
   }
 }
 
+/** A synchronous append boundary used when a run journal is made durable. */
+export interface EntrySink {
+  append(entry: Entry): void;
+}
+
+export class JournalWriteError extends ControlSignal {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JournalWriteError';
+  }
+}
+
 export const EntrySchema = z.object({
   tick: z.number().int(),
   kind: z.string(),

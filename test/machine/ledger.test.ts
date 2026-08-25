@@ -51,6 +51,21 @@ describe('Machine.Ledger', () => {
     expect([...ledger.journals.keys()]).toEqual([3]);
   });
 
+  it('never trades recorded external results for same-length non-port entries', () => {
+    const ledger = new MachineLedger();
+    const recorded = new JournalLog()
+      .append(JournalEntry.at(1, 'port_result', { port: 'probe' }))
+      .append(JournalEntry.at(1, 'receipt', {}));
+    const missingResult = new JournalLog()
+      .append(JournalEntry.at(1, 'receipt', {}))
+      .append(JournalEntry.at(2, 'receipt', {}));
+
+    ledger.remember(3, recorded);
+    ledger.remember(3, missingResult);
+
+    expect(ledger.journalFor(3)).toBe(recorded);
+  });
+
   it('preserves denial payloads', () => {
     const ledger = new MachineLedger();
     ledger.append({ ticket: 5, kind: MACHINE_DENIED, payload: { reason: '深さが尽きている' } });

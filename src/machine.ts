@@ -7,6 +7,7 @@ import { registry as defaultRegistry, type Registry as PortRegistry } from './po
 import type { Registry as ProgramRegistry } from './program.js';
 import { Feed } from './machine/feed.js';
 import { Intake, Submission, type SubmissionOptions } from './machine/intake.js';
+import { FileStore } from './machine/store.js';
 import {
   ACCEPTED,
   COMPLETED,
@@ -22,6 +23,10 @@ export interface MachineOptions {
   readonly policy?: Policy;
   readonly intake?: Intake;
   readonly ledger?: Ledger;
+  /** Opt-in append-only filesystem persistence. */
+  readonly stateDir?: string;
+  /** A reusable explicit store seam; mutually exclusive with stateDir. */
+  readonly store?: FileStore;
 }
 
 export interface AdvanceOptions {
@@ -72,13 +77,29 @@ export class Machine {
   readonly #programs: ProgramRegistry;
   readonly #ports: PortRegistry;
   readonly #policy: Policy;
+  readonly #store: FileStore | undefined;
 
   constructor(options: MachineOptions) {
     this.#programs = options.programs;
     this.#ports = options.ports ?? defaultRegistry;
     this.#policy = options.policy ?? new AllowAll();
-    this.intake = options.intake ?? new Intake();
-    this.ledger = options.ledger ?? new Ledger();
+    if (options.stateDir !== undefined && options.store !== undefined) {
+      throw new TypeError('stateDir and store are mutually exclusive');
+    }
+    this.#store = options.store ?? (options.stateDir === undefined
+      ? undefined
+      : new FileStore(options.stateDir));
+    if (this.#store !== undefined && (options.intake !== undefined || options.ledger !== undefined)) {
+      throw new TypeError('persistent Machine restores its own intake and ledger');
+    }
+    if (this.#store === undefined) {
+      this.intake = options.intake ?? new Intake();
+      this.ledger = options.ledger ?? new Ledger();
+    } else {
+      const restored = this.#store.load();
+      this.intake = restored.intake;
+      this.ledger = restored.ledger;
+    }
     this.intake.advanceTo(this.ledger.maxTicket);
   }
 
@@ -97,7 +118,8 @@ export class Machine {
   async step(options: AdvanceOptions = {}): Promise<Completion | undefined> {
     const submission = this.intake.take();
     if (submission === undefined) return undefined;
-    return this.#launch(submission, new Log(), options.maxEffects ?? null);
+    const journal = this.ledger.journalFor(submission.ticket) ?? new Log();
+    return this.#launch(submission, journal, options.maxEffects ?? null);
   }
 
   async drain(options: DrainOptions = {}): Promise<readonly Completion[]> {
@@ -135,17 +157,25 @@ export class Machine {
   }
 
   async #launch(submission: Submission, journal: Log, maxEffects: number | null): Promise<Completion> {
-    const outcome = await run(this.#entryProgram(submission), {
-      policy: this.#policy,
-      seed: submission.seed,
-      registry: this.#ports,
-      programs: this.#programs,
-      kit: submission.kit,
-      journal,
-      maxEffects,
-    });
-    this.#record(submission.ticket, outcome);
-    return new Completion(submission.ticket, outcome);
+    const writer = this.#store?.writer(submission.ticket, journal);
+    try {
+      const outcome = await run(this.#entryProgram(submission), {
+        policy: this.#policy,
+        seed: submission.seed,
+        registry: this.#ports,
+        programs: this.#programs,
+        kit: submission.kit,
+        journal,
+        journalSink: writer,
+        maxEffects,
+      });
+      if (!outcome.suspended) writer?.assertComplete();
+      this.#record(submission.ticket, outcome);
+      return new Completion(submission.ticket, outcome);
+    } catch (error) {
+      if (writer !== undefined) this.ledger.remember(submission.ticket, writer.journal);
+      throw error;
+    }
   }
 
   #entryProgram(submission: Submission): AsyncTask {
@@ -178,4 +208,4 @@ export class Machine {
   }
 }
 
-export { Feed, Intake, Submission, Ledger };
+export { Feed, FileStore, Intake, Submission, Ledger };

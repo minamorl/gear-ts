@@ -1,4 +1,4 @@
-import { Entry, Log, PORT_RESULT } from '../journal.js';
+import { Entry, JournalWriteError, Log, PORT_RESULT, type EntrySink } from '../journal.js';
 import { normalizeJson } from '../json.js';
 import { Receipt, type ReceiptOutcome } from '../receipt.js';
 import type { VerdictValue } from '../admission/verdict.js';
@@ -16,7 +16,12 @@ function errorMessage(error: unknown): string {
 export class Recorder {
   #log = new Log();
   readonly #receipts: Receipt[] = [];
+  readonly #sink: EntrySink | undefined;
   #last: Receipt | null = null;
+
+  constructor(sink?: EntrySink) {
+    this.#sink = sink;
+  }
 
   get journal(): Log {
     return this.#log;
@@ -89,7 +94,15 @@ export class Recorder {
   }
 
   #append(tick: number, kind: string, payload: Record<string, unknown>): void {
-    this.#log = this.#log.append(Entry.at(tick, kind, payload));
+    const entry = Entry.at(tick, kind, payload);
+    try {
+      this.#sink?.append(entry);
+    } catch (cause) {
+      if (cause instanceof JournalWriteError) throw cause;
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      throw new JournalWriteError(`journal append failed: ${detail}`);
+    }
+    this.#log = this.#log.append(entry);
   }
 
   #issue(

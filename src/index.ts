@@ -54,6 +54,7 @@ export {
   Intake as MachineIntake,
   Submission as MachineSubmission,
   Ledger as MachineLedger,
+  FileStore as MachineFileStore,
 } from './machine.js';
 export type {
   MachineOptions,
@@ -67,7 +68,15 @@ export {
   COMPLETED as MACHINE_COMPLETED,
   SUSPENDED as MACHINE_SUSPENDED,
 } from './machine/ledger.js';
-export type { LedgerKind as MachineLedgerKind } from './machine/ledger.js';
+export {
+  LedgerDecodeError as MachineLedgerDecodeError,
+} from './machine/ledger.js';
+export type { LedgerKind as MachineLedgerKind, LedgerOptions } from './machine/ledger.js';
+export {
+  JournalAppendMismatch as MachineJournalAppendMismatch,
+  JournalWriter as MachineJournalWriter,
+} from './machine/store.js';
+export type { LoadedMachineState } from './machine/store.js';
 export { Feed as MachineFeed, Rejected as MachineFeedRejected } from './machine/feed.js';
 export type { FeedOptions as MachineFeedOptions, MachineFeedTarget } from './machine/feed.js';
 export type {
@@ -111,7 +120,9 @@ export {
   ReplayUnreadable,
   CrossedBoundary,
   JournalDecodeError,
+  JournalWriteError,
 } from './journal.js';
+export type { EntrySink as JournalEntrySink } from './journal.js';
 
 export { Receipt, BrokenChain, canonicalize } from './receipt.js';
 export type {
