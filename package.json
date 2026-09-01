@@ -1,6 +1,6 @@
 {
   "name": "@minamorl/gear",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,10 +22,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "pnpm run build && pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
-    "@minamorl/berylx": "workspace:*",
+    "@minamorl/berylx": "github:minamorl/berylx-ts#c6436986ed23ada2710bd31214035324e721ec2a",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,5 +37,10 @@
   "license": "MIT",
   "bin": {
     "gear-host": "dist/bin/host.js"
+  },
+  "description": "An execution machine for TypeScript: Clock, Admission, Executor, Journal, Receipt. Effects are data; the journal is the only truth.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minamorl/gear-ts.git"
   }
 }
