@@ -96,7 +96,7 @@ describe('View (Ruby view_test.rb 7-test parity)', () => {
     const text = new View.Text().render(journal);
     const summary = new View.Summary().render(journal);
 
-    expect(text).toMatch(/^tick 2 \/ 効果 1 \/ 拒否 0 \/ receipt 2\n  2 probe$/u);
+    expect(text).toMatch(/^tick 2 \/ effects 1 \/ denied 0 \/ receipt 2\n  2 probe$/u);
     expect(text.endsWith('\n')).toBe(false);
     expect(Object.getPrototypeOf(summary)).toBe(Object.prototype);
     expect(summary.last_tick).toBe(2);
@@ -122,8 +122,8 @@ describe('View (Ruby view_test.rb 7-test parity)', () => {
 
     expect(projection.denials).toHaveLength(1);
     expect(Object.keys(projection.denials[0]!)).toEqual(['tick', 'tag', 'reason']);
-    expect(text).toBe('tick 1 / 効果 0 / 拒否 1 / receipt 0\n' +
-      '  1 拒否 program_submit — program double は渡されていない');
+    expect(text).toBe('tick 1 / effects 0 / denied 1 / receipt 0\n' +
+      '  1 denied program_submit — program double was not handed down');
   });
 
   it('enters input as a program and changes no view state', () => {
