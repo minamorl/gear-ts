@@ -107,7 +107,6 @@ export const EntrySchema = z.object({
   kind: z.string(),
   payload: z.record(z.string(), z.unknown()),
 });
-export const SCHEMA = EntrySchema;
 
 export class Log implements Iterable<Entry> {
   readonly #entries: readonly Entry[];
