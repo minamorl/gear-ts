@@ -134,7 +134,7 @@ export class Machine {
 
   async resume(ticket: number, options: AdvanceOptions = {}): Promise<Completion> {
     const journal = this.ledger.journalFor(ticket);
-    if (journal === undefined) throw new Error(`ticket ${ticket} には続ける走行が無い`);
+    if (journal === undefined) throw new Error(`ticket ${ticket} has no run to continue`);
     return this.#launch(this.#submissionOf(ticket), journal, options.maxEffects ?? null);
   }
 
@@ -152,7 +152,7 @@ export class Machine {
 
   #submissionOf(ticket: number): Submission {
     const accepted = this.ledger.forTicket(ticket).find((record) => record.kind === ACCEPTED);
-    if (accepted === undefined) throw new Error(`ticket ${ticket} の受付記録が無い`);
+    if (accepted === undefined) throw new Error(`ticket ${ticket} has no intake record`);
     return Submission.fromRecord(accepted.payload);
   }
 

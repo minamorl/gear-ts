@@ -89,7 +89,7 @@ export function focusWithKit(focus: unknown, kit: Kit | null): unknown {
   if (kit === null) return focus;
   if (focus instanceof Focus) return focus.put(Kit.FOCUS_KEY, kit.toJSON());
   if (focus === null || typeof focus !== 'object' || Array.isArray(focus)) {
-    throw new TypeError('Kit を渡す focus は plain object または Focus にする');
+    throw new TypeError('a focus carrying a Kit must be a plain object or a Focus');
   }
   return { ...(focus as Record<string, unknown>), [Kit.FOCUS_KEY]: kit.toJSON() };
 }

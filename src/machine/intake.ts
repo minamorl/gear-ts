@@ -27,7 +27,7 @@ export interface SubmissionRecord {
 }
 
 function safeInteger(value: number, label: string): number {
-  if (!Number.isSafeInteger(value)) throw new TypeError(`${label} は安全な整数にする`);
+  if (!Number.isSafeInteger(value)) throw new TypeError(`${label} must be a safe integer`);
   return value;
 }
 

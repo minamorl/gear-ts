@@ -32,7 +32,7 @@ export function substitute(value: JsonValue, params: RoutineParameters): unknown
   if (isHole(value)) {
     const name = value[HOLE];
     if (!Object.prototype.hasOwnProperty.call(params, name)) {
-      throw new TypeError(`ルーチン引数が渡されていない: ${name}`);
+      throw new TypeError(`routine parameter was not supplied: ${name}`);
     }
     return params[name];
   }

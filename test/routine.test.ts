@@ -261,7 +261,7 @@ describe('Routine (Ruby routine_test.rb 8-test parity)', () => {
       not_a_hole: { [Routine.HOLE]: 'literal', nested: 2 },
     });
     expect(() => Routine.substitute({ [Routine.HOLE]: 'missing' }, {}))
-      .toThrow(/ルーチン引数が渡されていない: missing/u);
+      .toThrow(/routine parameter was not supplied: missing/u);
   });
 
   it('runs an empty routine as a normal no-op Task', async () => {

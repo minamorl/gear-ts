@@ -16,7 +16,7 @@ function names(values: Iterable<string>): readonly string[] {
 
 function depthOf(value: number): number {
   if (!Number.isSafeInteger(value) || value < 0) {
-    throw new RangeError('depth は 0 以上の安全な整数にする');
+    throw new RangeError('depth must be a non-negative safe integer');
   }
   return value;
 }
