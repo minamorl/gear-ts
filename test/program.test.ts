@@ -50,11 +50,11 @@ describe('Program', () => {
     const programs = registry();
     expect(() =>
       programs.register({ name: 'fetch', task: task('fetch'), input: RawInput, output: Document }),
-    ).toThrow(/既に登録/u);
+    ).toThrow(/already registered/u);
   });
 
   it('does not fetch an unregistered bare task', () => {
-    expect(() => registry().fetch('nope')).toThrow(/素の Task は実行機に乗らない/u);
+    expect(() => registry().fetch('nope')).toThrow(/a bare Task does not board the machine/u);
   });
 
   it('checks boundaries before execution', () => {

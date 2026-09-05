@@ -320,7 +320,7 @@ describe('Executor', () => {
     expect(raised).toBeInstanceOf(ReplayMismatch);
     expect(raised).toMatchObject({ tick: 1, recordedPort: 'alpha', requestedTag: 'beta' });
     expect((raised as ReplayMismatch).message).toMatch(
-      /tick 1: journal は alpha を記録しているが program は beta を要求した/u,
+      /tick 1: the journal recorded alpha but the program requested beta/u,
     );
   });
 
@@ -360,7 +360,7 @@ describe('Executor', () => {
     expect(out.result).toBeInstanceOf(Err);
     const denied = out.journal.toArray().filter((entry) => entry.kind === 'admission_denied');
     expect(denied).toHaveLength(1);
-    expect(denied[0]?.payload.reason).toMatch(/渡されていない/u);
+    expect(denied[0]?.payload.reason).toMatch(/was not handed down/u);
     expect(denied[0]?.payload.by).toBe('by_kit');
   });
 

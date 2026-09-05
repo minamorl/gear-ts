@@ -32,7 +32,7 @@ export function substitute(value: JsonValue, params: RoutineParameters): unknown
   if (isHole(value)) {
     const name = value[HOLE];
     if (!Object.prototype.hasOwnProperty.call(params, name)) {
-      throw new TypeError(`ルーチン引数が渡されていない: ${name}`);
+      throw new TypeError(`routine parameter was not supplied: ${name}`);
     }
     return params[name];
   }
@@ -53,14 +53,16 @@ export function holeNames(value: JsonValue): string[] {
   return [];
 }
 
-function tickSelected(selection: TickSelection | undefined, tick: number): boolean {
+export function tickSelected(selection: TickSelection | undefined, tick: number): boolean {
   if (selection === undefined) return true;
   if (typeof selection === 'function') return selection(tick);
   if ('has' in selection) return selection.has(tick);
   return selection.includes(tick);
 }
 
-function tagSet(tags: FromJournalOptions['tags']): ReadonlySet<string> | undefined {
+export function tagSet(
+  tags: readonly string[] | ReadonlySet<string> | undefined,
+): ReadonlySet<string> | undefined {
   return tags === undefined ? undefined : new Set(Array.from(tags, String));
 }
 

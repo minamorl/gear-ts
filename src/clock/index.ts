@@ -8,9 +8,6 @@ export { Tick } from './tick.js';
 export const CLOCK_RANDOM_TAG = 'clock_random' as const;
 export const ClockRandomPayload = z.object({ bound: z.number().int() });
 export const ClockRandomResult = z.object({ value: z.number().int() });
-export const RANDOM_TAG = CLOCK_RANDOM_TAG;
-export const RANDOM_PAYLOAD = ClockRandomPayload;
-export const RANDOM_RESULT = ClockRandomResult;
 
 export class Clock {
   static readonly ORIGIN_INDEX = 0;

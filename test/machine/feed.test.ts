@@ -85,8 +85,8 @@ describe('Machine.Feed', () => {
 
     expect(accepted).toHaveLength(1);
     expect(feed.rejected).toHaveLength(2);
-    expect(feed.rejected[0]?.reason).toMatch(/JSON として読めない/u);
-    expect(feed.rejected[1]?.reason).toMatch(/name が無い/u);
+    expect(feed.rejected[0]?.reason).toMatch(/not readable as JSON/u);
+    expect(feed.rejected[1]?.reason).toMatch(/name is missing/u);
   });
 
   it('accepts a Unix-socket program through Machine.submit and then runs it', async () => {

@@ -100,12 +100,12 @@ export class Text {
   render(journal: Log | Iterable<Entry>): string {
     const projection = project(journal);
     const lines = [
-      `tick ${projection.lastTick} / 効果 ${projection.effects.length} / ` +
-        `拒否 ${projection.denials.length} / receipt ${projection.receipts.length}`,
+      `tick ${projection.lastTick} / effects ${projection.effects.length} / ` +
+        `denied ${projection.denials.length} / receipt ${projection.receipts.length}`,
     ];
     for (const effect of projection.effects) lines.push(`  ${effect.tick} ${String(effect.port)}`);
     for (const denial of projection.denials) {
-      lines.push(`  ${denial.tick} 拒否 ${String(denial.tag)} — ${String(denial.reason)}`);
+      lines.push(`  ${denial.tick} denied ${String(denial.tag)} — ${String(denial.reason)}`);
     }
     return lines.join('\n');
   }

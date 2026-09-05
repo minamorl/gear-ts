@@ -5,6 +5,8 @@ import {
   HOLE,
   holeNames,
   substitute,
+  tickSelected,
+  tagSet,
   type RoutineParameters,
   type TickSelection,
 } from '../routine.js';
@@ -39,17 +41,6 @@ export type RoutineRunOptions = RunOptions & {
   readonly params?: RoutineParameters;
 };
 
-function tickSelected(selection: TickSelection | undefined, tick: number): boolean {
-  if (selection === undefined) return true;
-  if (typeof selection === 'function') return selection(tick);
-  if ('has' in selection) return selection.has(tick);
-  return selection.includes(tick);
-}
-
-function tagSet(tags: SliceOptions['tags']): ReadonlySet<string> | undefined {
-  return tags === undefined ? undefined : new Set(Array.from(tags, String));
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -74,7 +65,7 @@ export class Definition {
   toTask(params: RoutineParameters = {}): BerylxNode {
     const missing = this.params.filter((name) => !Object.prototype.hasOwnProperty.call(params, name));
     if (missing.length > 0) {
-      throw new TypeError(`ルーチン ${this.name} の引数が足りない: ${missing.join(', ')}`);
+      throw new TypeError(`routine ${this.name} is missing parameters: ${missing.join(', ')}`);
     }
 
     const tasks = this.steps.map((step, index) => this.#stepTask(step, index, params));

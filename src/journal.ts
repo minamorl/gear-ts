@@ -1,6 +1,6 @@
 import { ControlSignal } from '@minamorl/berylx';
 import { z } from 'zod';
-import { normalizeJson, type JsonObject } from './json.js';
+import { normalizeJson, stableJson, type JsonObject } from './json.js';
 
 export const PORT_RESULT = 'port_result' as const;
 
@@ -17,8 +17,8 @@ export class ReplayMismatch extends ControlSignal {
     position: number,
   ) {
     super(
-      `tick ${tick}: journal は ${String(recordedPort)} を記録しているが ` +
-        `program は ${requestedTag} を要求した`,
+      `tick ${tick}: the journal recorded ${String(recordedPort)} but ` +
+        `the program requested ${requestedTag}`,
     );
     this.tick = tick;
     this.recordedPort = recordedPort;
@@ -52,7 +52,7 @@ export class ReplayUnreadable extends ControlSignal {
     value: unknown,
   ) {
     super(
-      `tick ${tick}: ${tag} の記録が result schema で読み戻せない: ` +
+      `tick ${tick}: the record for ${tag} cannot be read back through its result schema: ` +
         violations.map((violation) => violation.message).join('; '),
     );
     this.tick = tick;
@@ -76,7 +76,7 @@ export class JournalDecodeError extends Error {
 export class Entry {
   readonly tick: number;
   readonly kind: string;
-  readonly payload: Readonly<Record<string, unknown>>;
+  readonly payload: JsonObject;
 
   private constructor(tick: number, kind: string, payload: Record<string, unknown>) {
     this.tick = tick;
@@ -107,7 +107,6 @@ export const EntrySchema = z.object({
   kind: z.string(),
   payload: z.record(z.string(), z.unknown()),
 });
-export const SCHEMA = EntrySchema;
 
 export class Log implements Iterable<Entry> {
   readonly #entries: readonly Entry[];
@@ -165,20 +164,6 @@ function parseNdjson(text: string): DecodedLine[] {
     }
   }
   return decoded;
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(',')}]`;
-  }
-  if (value !== null && typeof value === 'object') {
-    const object = value as Record<string, unknown>;
-    return `{${Object.keys(object)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
 }
 
 function sameRequest(left: unknown, right: unknown): boolean {

@@ -14,6 +14,7 @@ import {
   load as loadJournal,
   type EntrySink,
 } from '../journal.js';
+import { stableJson } from '../json.js';
 import { Intake, Submission } from './intake.js';
 import {
   ACCEPTED,
@@ -26,18 +27,6 @@ import {
 
 const LEDGER_FILE = 'machine-ledger.ndjson';
 const JOURNAL_DIRECTORY = 'journals';
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const object = value as Record<string, unknown>;
-    return `{${Object.keys(object)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 
 function sameEntry(left: Entry, right: Entry): boolean {
   return left.tick === right.tick && left.kind === right.kind &&

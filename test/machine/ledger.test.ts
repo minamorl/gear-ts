@@ -13,7 +13,7 @@ describe('Machine.Ledger', () => {
   it('appends in order and keeps every record', () => {
     const ledger = new MachineLedger();
     ledger.append({ ticket: 1, kind: MACHINE_ACCEPTED });
-    ledger.append({ ticket: 2, kind: MACHINE_DENIED, payload: { reason: '渡されていない' } });
+    ledger.append({ ticket: 2, kind: MACHINE_DENIED, payload: { reason: 'was not handed down' } });
     ledger.append({ ticket: 1, kind: MACHINE_COMPLETED, payload: { receipts: 2 } });
 
     expect(ledger.size).toBe(3);
@@ -68,8 +68,8 @@ describe('Machine.Ledger', () => {
 
   it('preserves denial payloads', () => {
     const ledger = new MachineLedger();
-    ledger.append({ ticket: 5, kind: MACHINE_DENIED, payload: { reason: '深さが尽きている' } });
-    expect(ledger.forTicket(5)[0]?.payload.reason).toBe('深さが尽きている');
+    ledger.append({ ticket: 5, kind: MACHINE_DENIED, payload: { reason: 'depth is exhausted' } });
+    expect(ledger.forTicket(5)[0]?.payload.reason).toBe('depth is exhausted');
   });
 
   it('detaches and deeply freezes record payloads', () => {

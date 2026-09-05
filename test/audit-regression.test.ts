@@ -127,7 +127,7 @@ describe('adversarial audit regressions', () => {
       policy: allow(),
       seed: 1,
       focus: { n: 2 },
-      registry: ports(calls, 2, () => { throw new Error('ポートの向こうで壊れた'); }),
+      registry: ports(calls, 2, () => { throw new Error('broke on the far side of the port'); }),
     });
 
     expect(calls).toEqual([2]);

@@ -68,11 +68,11 @@ export class Registry {
       registration.input === undefined ||
       registration.output === undefined
     ) {
-      throw new TypeError('program には name / task / input / output が要る');
+      throw new TypeError('program requires name / task / input / output');
     }
     const name = String(registration.name);
     if (name.length === 0) throw new TypeError('program name must not be empty');
-    if (this.#byName.has(name)) throw new Error(`program ${name} は既に登録されている`);
+    if (this.#byName.has(name)) throw new Error(`program ${name} is already registered`);
     this.#byName.set(name, new Declaration(registration) as Declaration);
     return this;
   }
@@ -81,7 +81,7 @@ export class Registry {
     const key = String(name);
     const declaration = this.#byName.get(key);
     if (!declaration) {
-      throw new Error(`program ${key} は登録されていない (素の Task は実行機に乗らない)`);
+      throw new Error(`program ${key} is not registered (a bare Task does not board the machine)`);
     }
     return declaration;
   }

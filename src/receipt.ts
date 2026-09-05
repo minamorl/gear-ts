@@ -36,8 +36,6 @@ export interface IssueReceipt {
 export class BrokenChain extends Error {}
 
 export class Receipt implements ReceiptShape {
-  static readonly BrokenChain = BrokenChain;
-
   readonly id: string;
   readonly tick: number;
   readonly effect: JsonObject;

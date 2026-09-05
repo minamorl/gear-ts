@@ -138,7 +138,7 @@ describe('program_submit', () => {
     expect(out.result).toBeInstanceOf(Err);
     const denied = out.journal.toArray().filter((entry) => entry.kind === 'admission_denied');
     expect(denied).toHaveLength(1);
-    expect(denied[0]?.payload.reason).toMatch(/深さが尽きている/u);
+    expect(denied[0]?.payload.reason).toMatch(/depth is exhausted/u);
   });
 
   it('does not submit a program that was not handed down', async () => {
@@ -149,7 +149,7 @@ describe('program_submit', () => {
     });
     expect(calls).toEqual([]);
     const denied = out.journal.toArray().find((entry) => entry.kind === 'admission_denied');
-    expect(denied?.payload.reason).toMatch(/program double は渡されていない/u);
+    expect(denied?.payload.reason).toMatch(/program double was not handed down/u);
   });
 
   it('does not let an unregistered program ride the machine', async () => {
@@ -215,7 +215,7 @@ describe('program_submit', () => {
     expect(submit.request.tag).toBe(PROGRAM_SUBMIT_TAG);
     expect(submit.request.payload.name).toBe('double');
     expect(submit.grounds.map((ground) => ground.policy)).toEqual(['by_kit', 'allow_all']);
-    expect(submit.grounds[0]?.detail).toMatch(/program double を渡している/u);
+    expect(submit.grounds[0]?.detail).toMatch(/program double is handed down/u);
   });
 
   it('does not leak runtime inspect strings into the journal', async () => {
@@ -230,7 +230,7 @@ describe('program_submit', () => {
     const denied = out.journal.toArray().find((entry) => entry.kind === 'admission_denied');
     expect(denied?.payload.tag).toBe(PROGRAM_SUBMIT_TAG);
     expect(denied?.payload.by).toBe('by_kit');
-    expect(denied?.payload.reason).toMatch(/深さが尽きている/u);
+    expect(denied?.payload.reason).toMatch(/depth is exhausted/u);
   });
 
   it('returns ChildFailed as an ordinary Berylx Err when a child closes with Err', async () => {
