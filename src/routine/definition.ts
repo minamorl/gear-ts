@@ -74,7 +74,7 @@ export class Definition {
   toTask(params: RoutineParameters = {}): BerylxNode {
     const missing = this.params.filter((name) => !Object.prototype.hasOwnProperty.call(params, name));
     if (missing.length > 0) {
-      throw new TypeError(`ルーチン ${this.name} の引数が足りない: ${missing.join(', ')}`);
+      throw new TypeError(`routine ${this.name} is missing parameters: ${missing.join(', ')}`);
     }
 
     const tasks = this.steps.map((step, index) => this.#stepTask(step, index, params));

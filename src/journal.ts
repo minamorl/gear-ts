@@ -17,8 +17,8 @@ export class ReplayMismatch extends ControlSignal {
     position: number,
   ) {
     super(
-      `tick ${tick}: journal は ${String(recordedPort)} を記録しているが ` +
-        `program は ${requestedTag} を要求した`,
+      `tick ${tick}: the journal recorded ${String(recordedPort)} but ` +
+        `the program requested ${requestedTag}`,
     );
     this.tick = tick;
     this.recordedPort = recordedPort;
@@ -52,7 +52,7 @@ export class ReplayUnreadable extends ControlSignal {
     value: unknown,
   ) {
     super(
-      `tick ${tick}: ${tag} の記録が result schema で読み戻せない: ` +
+      `tick ${tick}: the record for ${tag} cannot be read back through its result schema: ` +
         violations.map((violation) => violation.message).join('; '),
     );
     this.tick = tick;
