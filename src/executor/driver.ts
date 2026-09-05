@@ -185,7 +185,7 @@ export class Driver {
 
   #obtainSubmit(payload: unknown, kit: Kit | null, depth: number): Obtained | Promise<Obtained> {
     if (depth >= Driver.MAX_SUBMIT_DEPTH) {
-      throw new TooDeep(`submit の入れ子が上限 ${Driver.MAX_SUBMIT_DEPTH} を超えた`);
+      throw new TooDeep(`submit nesting exceeded the limit of ${Driver.MAX_SUBMIT_DEPTH}`);
     }
     const childKit = kit?.descend() ?? null;
     const produced = this.#submission.run(payload, (task, focus) =>
@@ -199,8 +199,8 @@ export class Driver {
 
   #obtainRandom(tick: Tick, payload: unknown): Obtained {
     const checked = ClockRandomPayload.safeParse(payload);
-    if (!checked.success) throw new Error(`clock_random payload 不正: ${checked.error.message}`);
-    if (checked.data.bound <= 0) throw new Error('clock_random bound は正の Integer にする');
+    if (!checked.success) throw new Error(`invalid clock_random payload: ${checked.error.message}`);
+    if (checked.data.bound <= 0) throw new Error('clock_random bound must be a positive integer');
     const recorded = { value: this.#clock.rngFor(tick).nextInt(checked.data.bound) };
     return [recorded, recorded, false] as const;
   }
