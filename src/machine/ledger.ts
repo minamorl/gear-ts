@@ -29,7 +29,7 @@ export class LedgerDecodeError extends Error {
 export class Record {
   readonly ticket: number;
   readonly kind: LedgerKind;
-  readonly payload: Readonly<globalThis.Record<string, unknown>>;
+  readonly payload: JsonObject;
 
   constructor(ticket: number, kind: LedgerKind, payload: globalThis.Record<string, unknown>) {
     this.ticket = ticket;
