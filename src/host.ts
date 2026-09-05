@@ -28,7 +28,6 @@ export interface HostOptions {
   /** Programs that may be dispatched. May be empty if there are no passengers (a Machine that accepts nothing). */
   readonly programs: ProgramRegistry;
   /** Where Machine ledger and per-ticket journals live, when provided. */
-  /** Where Machine ledger and per-ticket journals live, when provided. */
   readonly stateDir?: string;
   /** Max items to process per drain. Null means drain until the intake queue is empty. */
   readonly drainLimit?: number | null;
@@ -53,13 +52,13 @@ export type HostEvent =
     }
   | { readonly kind: 'stopped'; readonly accepted: number; readonly completed: number };
 
-  /**
-   * Submits received lines to the Machine and advances them until they finish.
-   *
-   * Feed#absorb does not return until io closes, so submissions and executions are interleaved.
-   * The run itself is the Machine's own in-language runtime, and Host does not take the side
-   * of advancing the tick (that is Machine#drain).
-   */
+/**
+ * Submits received lines to the Machine and advances them until they finish.
+ *
+ * Feed#absorb does not return until io closes, so submissions and executions are interleaved.
+ * The run itself is the Machine's own in-language runtime, and Host does not take the side
+ * of advancing the tick (that is Machine#drain).
+ */
 export class Host {
   readonly machine: Machine;
   readonly #feed: Feed;

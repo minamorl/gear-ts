@@ -11,7 +11,7 @@ function promiseLike(value: unknown): value is Promise<Result> {
 
 function plainRecord(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-      throw new BoundaryError('program_submit payload must be a plain object');
+    throw new BoundaryError('program_submit payload must be a plain object');
   }
   return value as Record<string, unknown>;
 }
