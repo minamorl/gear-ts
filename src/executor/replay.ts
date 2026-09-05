@@ -6,20 +6,8 @@ import {
   type Entry,
   type Log,
 } from '../journal.js';
-import { normalizeJson } from '../json.js';
+import { normalizeJson, stableJson } from '../json.js';
 import type { Registry } from '../port/core.js';
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const object = value as Record<string, unknown>;
-    return `{${Object.keys(object)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 
 function recordedRequest(entry: Entry): unknown {
   if ('request' in entry.payload) return entry.payload.request;

@@ -1,6 +1,6 @@
 import { ControlSignal } from '@minamorl/berylx';
 import { z } from 'zod';
-import { normalizeJson, type JsonObject } from './json.js';
+import { normalizeJson, stableJson, type JsonObject } from './json.js';
 
 export const PORT_RESULT = 'port_result' as const;
 
@@ -164,20 +164,6 @@ function parseNdjson(text: string): DecodedLine[] {
     }
   }
   return decoded;
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableJson).join(',')}]`;
-  }
-  if (value !== null && typeof value === 'object') {
-    const object = value as Record<string, unknown>;
-    return `{${Object.keys(object)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
 }
 
 function sameRequest(left: unknown, right: unknown): boolean {

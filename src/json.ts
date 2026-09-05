@@ -81,3 +81,16 @@ function cloneJson(value: unknown, path: string, ancestors: Set<object>): JsonVa
 export function normalizeJson(value: unknown): JsonValue {
   return cloneJson(value, '$', new Set());
 }
+
+/** Serialize a value with object keys sorted, so two equal values compare equal. */
+export function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
