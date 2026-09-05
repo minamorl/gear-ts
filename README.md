@@ -82,11 +82,13 @@ console.log(projectView(done.outcome.journal).toJSON());
   "effects": [{ "tick": 2, "port": "greet_upcase" }],
   "denials": [],
   "receipts": [
-    { "tick": 2, "id": "908b6751a149700e", "tag": "greet_upcase", "predecessor": null },
-    { "tick": 1, "id": "34b1f866cc456663", "tag": "program_submit", "predecessor": "908b6751a149700e" }
+    { "tick": 2, "id": "d9f2d7492748dfff", "tag": "greet_upcase", "predecessor": null },
+    { "tick": 1, "id": "d5650040a13b5091", "tag": "program_submit", "predecessor": "d9f2d7492748dfff" }
   ]
 }
 ```
+
+receipt の `id` は tick・効果・結果・根拠を合わせた内容の SHA なので、admission の根拠が変われば id も変わる。上は実行して得た実測値である。
 
 `Kit.of({ ports: [], programs: [], depth: 0 })` を渡すと同じ program は走らない。
 `produced` は `null`、`receipts` は空、`denials` に拒否した tick と理由が 1 件残る。
