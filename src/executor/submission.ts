@@ -11,7 +11,7 @@ function promiseLike(value: unknown): value is Promise<Result> {
 
 function plainRecord(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new BoundaryError('program_submit payload は plain object にする');
+      throw new BoundaryError('program_submit payload must be a plain object');
   }
   return value as Record<string, unknown>;
 }
@@ -31,7 +31,7 @@ export class Submission {
     const declaration = this.#programs.fetch(name);
     if (!declaration.accepts(focus)) {
       throw new BoundaryError(
-        `program ${name} の入力が宣言 ${declaration.inputLabel} を満たさない`,
+        `input to program ${name} does not satisfy its declaration ${declaration.inputLabel}`,
       );
     }
 
@@ -49,13 +49,13 @@ export class Submission {
     result: Result,
   ): unknown {
     if (result instanceof Err) {
-      throw new ChildFailed(`子 program が Err で閉じた: ${result.message}`);
+      throw new ChildFailed(`child program closed with Err: ${result.message}`);
     }
     const raw = plainRecord(result.focus.toObject());
     const { [Kit.FOCUS_KEY]: _kit, ...withoutKit } = raw;
     const produced = plainRecord(normalizeJson(withoutKit));
     if (!produces(produced)) {
-      throw new BoundaryError(`program ${name} の出力が宣言 ${outputLabel} を満たさない`);
+      throw new BoundaryError(`output of program ${name} does not satisfy its declaration ${outputLabel}`);
     }
     return produced;
   }
