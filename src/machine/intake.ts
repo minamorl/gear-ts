@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { normalizeJson } from '../json.js';
+import { normalizeJson, type JsonValue } from '../json.js';
 import { Kit, type KitDeclaration } from '../kit.js';
 
 const SubmissionRecordSchema = z.object({
@@ -21,7 +21,7 @@ export interface SubmissionRecord {
   readonly [key: string]: unknown;
   readonly ticket: number;
   readonly name: string;
-  readonly focus: unknown;
+  readonly focus: JsonValue;
   readonly kit: KitDeclaration | null;
   readonly seed: number;
 }
@@ -35,7 +35,7 @@ function safeInteger(value: number, label: string): number {
 export class Submission {
   readonly ticket: number;
   readonly name: string;
-  readonly focus: unknown;
+  readonly focus: JsonValue;
   readonly kit: Kit | null;
   readonly seed: number;
 
