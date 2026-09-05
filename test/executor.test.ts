@@ -320,7 +320,7 @@ describe('Executor', () => {
     expect(raised).toBeInstanceOf(ReplayMismatch);
     expect(raised).toMatchObject({ tick: 1, recordedPort: 'alpha', requestedTag: 'beta' });
     expect((raised as ReplayMismatch).message).toMatch(
-      /tick 1: journal は alpha を記録しているが program は beta を要求した/u,
+      /tick 1: the journal recorded alpha but the program requested beta/u,
     );
   });
 

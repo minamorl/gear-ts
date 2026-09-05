@@ -13,7 +13,7 @@ describe('Machine.Ledger', () => {
   it('appends in order and keeps every record', () => {
     const ledger = new MachineLedger();
     ledger.append({ ticket: 1, kind: MACHINE_ACCEPTED });
-    ledger.append({ ticket: 2, kind: MACHINE_DENIED, payload: { reason: '渡されていない' } });
+    ledger.append({ ticket: 2, kind: MACHINE_DENIED, payload: { reason: 'was not handed down' } });
     ledger.append({ ticket: 1, kind: MACHINE_COMPLETED, payload: { receipts: 2 } });
 
     expect(ledger.size).toBe(3);

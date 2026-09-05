@@ -12,10 +12,10 @@ class TagAllowlist implements Admission.Policy {
   judge(request: Admission.Request): Admission.VerdictValue {
     if (this.#allowed.has(request.tag)) {
       return Admission.Verdict.admit(request, [
-        new Admission.Grant('tag_allowlist', `${request.tag} は許可リストにある`),
+        new Admission.Grant('tag_allowlist', `${request.tag} is on the allowlist`),
       ]);
     }
-    return Admission.Verdict.deny(request, `${request.tag} は許可リストに無い`, 'tag_allowlist');
+    return Admission.Verdict.deny(request, `${request.tag} is not on the allowlist`, 'tag_allowlist');
   }
 }
 
