@@ -1,19 +1,21 @@
 // ==================================================================
-// Host — gear を「別プロセスの常駐」として立てるための殻。
+// Host — a shell for setting gear up as a "resident of a separate process."
 //
-// gear.spec の位置づけ:
+// Position of gear.spec:
 //   pin runtime.in_language        : gear.runtime.form = in_language_runtime
 //   pin runtime.not_a_daemon_core  : forbid gear.runtime.form = separate_process_daemon_core
-//   free machine.hosting           : 機械を別プロセスの常駐として立てるときの監督
-//                                    (起動・再起動・複数台) の形は未決
+//   free machine.hosting           : supervision when a Machine is set up as
+//                                    a resident of a separate process
+//                                    (startup · restart · multi-Machine) shape undecided
 //
-// 禁じられているのは「核を daemon にすること」であって「常駐として立てること」では
-// ない。Host は Machine を **言語内 runtime のまま** 抱えるだけの殻で、外から核へ
-// RPC する経路を一切作らない。投入は pin ui.transport_core_in_process のとおり
-// in-process の受付列 (Intake) へ、Feed 経由で 1 件 1 行の素データとして入る。
+// What is forbidden is "making the core a daemon," not "setting it up as a resident."
+// Host is only a shell that holds the Machine **as an in-language runtime**, and does not
+// create any path to RPC to the core from the outside. Submissions enter in-process
+// via the Intake queue, one raw data line at a time through Feed, per pin ui.transport_core_in_process.
 //
-// Ruby 側に対応物が無い (gear gem に bin/ も executables も無い)。よってこれは
-// 移植ではなく新規であり、Ruby との答え合わせが効かない唯一の面である。
+// There is no Ruby equivalent (no bin/ or executables in the gear gem). So this is
+// not a port but a new piece, and the only face that cannot be answer-checked
+// against Ruby.
 // ==================================================================
 import { Err } from '@minamorl/berylx';
 import { Machine } from './machine.js';
@@ -21,15 +23,16 @@ import { Feed } from './machine/feed.js';
 import type { Registry as ProgramRegistry } from './program.js';
 
 export interface HostOptions {
-  /** 1 件 1 行の素データが流れてくる読み口。FIFO でも stdin でも良い。 */
+  /** Where raw one-item-per-line data streams in. FIFO or stdin are both fine. */
   readonly io: NodeJS.ReadableStream;
-  /** 走らせられる program。乗客が居なければ空で良い (何も受け付けない機械になる)。 */
+  /** Programs that may be dispatched. May be empty if there are no passengers (a Machine that accepts nothing). */
   readonly programs: ProgramRegistry;
-  /** Machine ledger and per-ticket journals live below this directory when provided. */
+  /** Where Machine ledger and per-ticket journals live, when provided. */
+  /** Where Machine ledger and per-ticket journals live, when provided. */
   readonly stateDir?: string;
-  /** 1 回の drain で処理する上限。null なら受付列が空になるまで。 */
+  /** Max items to process per drain. Null means drain until the intake queue is empty. */
   readonly drainLimit?: number | null;
-  /** 進捗の報告先。既定は無音。 */
+  /** Where to report progress. Silent by default. */
   readonly report?: (event: HostEvent) => void;
 }
 
@@ -39,24 +42,24 @@ export type HostEvent =
   | {
       readonly kind: 'completed';
       readonly ticket: number;
-      /** admission が拒んだか。実行が失敗したのとは別のこと。 */
+      /** Whether admission rejected it. Distinct from the execution failing. */
       readonly denied: boolean;
-      /** 走行そのものの結果。ok / err / suspended。 */
+      /** The outcome of the run itself. ok / err / suspended. */
       readonly outcome: 'ok' | 'err' | 'suspended';
-      /** err のときの理由。常駐は覗けないので、ここを空にしない。 */
+      /** The reason if err. A resident can't be peeped from outside, so do not leave this empty. */
       readonly error?: string;
       readonly receipts: number;
       readonly lastTick: number;
     }
   | { readonly kind: 'stopped'; readonly accepted: number; readonly completed: number };
 
-/**
- * 受け取った行を Machine へ投入し、走り終わるまで進める。
- *
- * Feed#absorb は io が閉じるまで返らないので、投入と実行を交互に回す。
- * 走行そのものは Machine が持つ言語内 runtime で、Host は tick を進める側に立たない
- * (進めるのは Machine#drain)。
- */
+  /**
+   * Submits received lines to the Machine and advances them until they finish.
+   *
+   * Feed#absorb does not return until io closes, so submissions and executions are interleaved.
+   * The run itself is the Machine's own in-language runtime, and Host does not take the side
+   * of advancing the tick (that is Machine#drain).
+   */
 export class Host {
   readonly machine: Machine;
   readonly #feed: Feed;
@@ -73,16 +76,17 @@ export class Host {
     this.#report = options.report ?? (() => {});
   }
 
-  /** 外から止める。いま走っている分は捨てずに走り切ってから返る。 */
+  /** Stop from outside. Finishes the currently-running work (does not discard it) before returning. */
   stop(): void {
     this.#stopping = true;
   }
 
   /**
-   * io が閉じるまで走り続ける。
+   * Runs until io closes.
    *
-   * 1 行ずつ吸って、そのつど受付列を空にする。まとめて吸ってからまとめて走らせると、
-   * 投入した順と走った順の対応が journal から読み取りにくくなるため。
+   * Absorbs one line at a time and drains the intake queue each time. If you absorbed in bulk
+   * and ran in bulk, the correspondence between "submitted order" and "run order" would become
+   * hard to read from the journal.
    */
   async run(): Promise<{ readonly accepted: number; readonly completed: number }> {
     // A previous process may have durably accepted an item before it could pick it up.
@@ -93,14 +97,14 @@ export class Host {
       for (const rejected of this.#feed.rejected.slice(before)) {
         this.#report({ kind: 'rejected', line: rejected.line, reason: rejected.reason });
       }
-      if (submissions.length === 0) break; // io が閉じた
+      if (submissions.length === 0) break; // io closed
       for (const submission of submissions) {
         this.#accepted += 1;
         this.#report({ kind: 'accepted', ticket: submission.ticket });
       }
       await this.#drain();
     }
-    await this.#drain(); // 停止指示の時点で残っていた分を取りこぼさない
+    await this.#drain(); // do not drop items that remained at the moment of the stop signal
     const totals = { accepted: this.#accepted, completed: this.#completed };
     this.#report({ kind: 'stopped', ...totals });
     return totals;
@@ -111,8 +115,8 @@ export class Host {
     for (const completion of completions) {
       this.#completed += 1;
       const outcome = completion.outcome;
-      // 「完了した」だけを報告すると、失敗した走行が成功と見分けられなくなる。
-      // 常駐は外から覗けないので、結果の別と理由をここで必ず残す。
+      // Reporting only "completed" would make it impossible to distinguish a failed run from a successful one.
+      // A resident cannot be peeped from outside, so always leave the outcome type and reason here.
       const failed = outcome.result instanceof Err;
       this.#report({
         kind: 'completed',
