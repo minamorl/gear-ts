@@ -12,7 +12,7 @@ const SubmissionRecordSchema = z.object({
 
 export interface SubmissionOptions {
   readonly name: string;
-  readonly focus?: unknown;
+  readonly focus?: JsonValue;
   readonly kit?: Kit | null;
   readonly seed?: number | null;
 }

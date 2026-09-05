@@ -76,7 +76,7 @@ export class JournalDecodeError extends Error {
 export class Entry {
   readonly tick: number;
   readonly kind: string;
-  readonly payload: Readonly<Record<string, unknown>>;
+  readonly payload: JsonObject;
 
   private constructor(tick: number, kind: string, payload: Record<string, unknown>) {
     this.tick = tick;

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeJson } from '../json.js';
 import { Kit } from '../kit.js';
 import { Intake, type Submission, type SubmissionOptions } from './intake.js';
 
@@ -132,7 +133,7 @@ export class Feed {
         }
         seed = data.seed;
       }
-      return this.#accept({ name, focus: data.focus ?? {}, kit, seed });
+      return this.#accept({ name, focus: data.focus ?? normalizeJson({}), kit, seed });
     } catch (error) {
       if (error instanceof SyntaxError) {
         return this.#reject(text, `not readable as JSON: ${error.message}`);
