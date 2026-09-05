@@ -66,12 +66,6 @@ export class Completion {
 
 /** Explicitly stepped shell around intake, admission, executor, journal, and receipts. */
 export class Machine {
-  static readonly Completion = Completion;
-  static readonly Submission = Submission;
-  static readonly Intake = Intake;
-  static readonly Ledger = Ledger;
-  static readonly Feed = Feed;
-
   readonly intake: Intake;
   readonly ledger: Ledger;
   readonly #programs: ProgramRegistry;
