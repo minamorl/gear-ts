@@ -8,13 +8,13 @@ export interface Policy {
 
 export class AllowAll implements Policy {
   judge(request: Request): VerdictValue {
-    return Verdict.admit(request, [new Grant('allow_all', '既定許可スタンス')]);
+    return Verdict.admit(request, [new Grant('allow_all', 'default allow stance')]);
   }
 }
 
 export class DenyAll implements Policy {
   judge(request: Request): VerdictValue {
-    return Verdict.deny(request, '既定拒否スタンス', 'deny_all');
+    return Verdict.deny(request, 'default deny stance', 'deny_all');
   }
 }
 
@@ -34,21 +34,21 @@ export class ByKit implements Policy {
   judge(request: Request): VerdictValue {
     if (request.tag === PROGRAM_SUBMIT_TAG) return this.#judgeSubmit(request);
     if (!this.#kit.port(request.tag)) {
-      return this.#refuse(request, `port ${request.tag} は渡されていない`);
+      return this.#refuse(request, `port ${request.tag} was not handed down`);
     }
-    return this.#allow(request, `port ${request.tag} を渡している`);
+    return this.#allow(request, `port ${request.tag} is handed down`);
   }
 
   #judgeSubmit(request: Request): VerdictValue {
     const payload = request.payload as { readonly name?: unknown } | null;
     const name = String(payload?.name);
     if (!this.#kit.submit()) {
-      return this.#refuse(request, '深さが尽きているか繋ぐ相手が渡されていない');
+      return this.#refuse(request, 'depth is exhausted or no program was handed down');
     }
     if (!this.#kit.program(name)) {
-      return this.#refuse(request, `program ${name} は渡されていない`);
+      return this.#refuse(request, `program ${name} was not handed down`);
     }
-    return this.#allow(request, `program ${name} を渡している`);
+    return this.#allow(request, `program ${name} is handed down`);
   }
 
   #refuse(request: Request, reason: string): VerdictValue {
@@ -65,7 +65,7 @@ export class All implements Policy {
 
   constructor(...policies: Policy[]) {
     if (policies.length === 0) {
-      throw new TypeError('All には最低 1 つの policy が要る (既定を発明しない)');
+      throw new TypeError('All requires at least one policy (it invents no default)');
     }
     this.#policies = policies;
   }

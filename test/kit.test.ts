@@ -91,7 +91,7 @@ describe('Kit', () => {
     expect(verdict.denied).toBe(true);
     if (!verdict.denied) throw new Error('expected denial');
     expect(verdict.by).toBe('by_kit');
-    expect(verdict.reason).toMatch(/渡されていない/u);
+    expect(verdict.reason).toMatch(/was not handed down/u);
   });
 
   it('denies every port when nothing was handed down', () => {

@@ -68,8 +68,8 @@ describe('Machine.Ledger', () => {
 
   it('preserves denial payloads', () => {
     const ledger = new MachineLedger();
-    ledger.append({ ticket: 5, kind: MACHINE_DENIED, payload: { reason: '深さが尽きている' } });
-    expect(ledger.forTicket(5)[0]?.payload.reason).toBe('深さが尽きている');
+    ledger.append({ ticket: 5, kind: MACHINE_DENIED, payload: { reason: 'depth is exhausted' } });
+    expect(ledger.forTicket(5)[0]?.payload.reason).toBe('depth is exhausted');
   });
 
   it('detaches and deeply freezes record payloads', () => {

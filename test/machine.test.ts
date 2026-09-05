@@ -152,7 +152,7 @@ describe('Machine', () => {
     expect(completion?.denied).toBe(true);
     expect(runtime.stateOf(ticket)).toBe(MACHINE_DENIED);
     expect(runtime.ledger.forTicket(ticket).at(-1)?.payload.reason)
-      .toMatch(/program double は渡されていない/u);
+      .toMatch(/program double was not handed down/u);
   });
 
   it('closes an unregistered program as completed with an Err', async () => {

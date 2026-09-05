@@ -360,7 +360,7 @@ describe('Executor', () => {
     expect(out.result).toBeInstanceOf(Err);
     const denied = out.journal.toArray().filter((entry) => entry.kind === 'admission_denied');
     expect(denied).toHaveLength(1);
-    expect(denied[0]?.payload.reason).toMatch(/渡されていない/u);
+    expect(denied[0]?.payload.reason).toMatch(/was not handed down/u);
     expect(denied[0]?.payload.by).toBe('by_kit');
   });
 
