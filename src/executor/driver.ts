@@ -152,7 +152,7 @@ export class Driver {
   #admit(tag: string, payload: unknown, kit: Kit | null): readonly [Tick, VerdictValue] {
     if (this.#maxEffects !== null && this.#processed >= this.#maxEffects) throw new Suspend();
     const tick = this.#clock.advance();
-    const verdict = this.#authority.judge(new Request(tag, payload), kit);
+    const verdict = this.#authority.judge(new Request(tag, normalizeJson(payload)), kit);
     if (!verdict.denied) this.#processed += 1;
     return [tick, verdict] as const;
   }
