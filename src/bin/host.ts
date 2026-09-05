@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // ==================================================================
-// gear の常駐入口。
+// Long-lived entry point for gear.
 //
-// 投入は FIFO から 1 件 1 行。HTTP は listen しない —— 核へ外から到達する経路を
-// 作らないため (pin runtime.not_a_daemon_core / pin ui.transport_core_in_process)。
+// Rows are injected one per line through a FIFO. HTTP is not listened on — this
+// avoids making any route through which something external can reach the core
+// (pin runtime.not_a_daemon_core / pin ui.transport_core_in_process).
 //
-// 環境変数:
-//   GEAR_STATE_DIR  状態の置き場所 (必須)。FIFO は <STATE_DIR>/intake。
-//                   release の中には書かない (release は不変で、世代で捨てられる)。
+// Environment variables:
+//   GEAR_STATE_DIR  Where state lives (required). The FIFO sits at <STATE_DIR>/intake.
+//                   Never written to from within the release (release is immutable,
+//                   discarded by generation).
 // ==================================================================
 import { mkdirSync, existsSync, createReadStream, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -23,24 +25,28 @@ const fifo = join(stateDir, 'intake');
 const logFile = join(stateDir, 'host.log');
 
 mkdirSync(stateDir, { recursive: true, mode: 0o700 });
-// FIFO は mkfifo でしか作れない。既に在れば作り直さない (書き手が開いている可能性がある)。
+// A FIFO can only be created with mkfifo. Do not recreate if one already exists
+// (a writer may still have it open).
 if (!existsSync(fifo)) execFileSync('mkfifo', ['-m', '600', fifo]);
 
 function record(event: HostEvent | { kind: string; [key: string]: unknown }): void {
-  // 時刻は Clock ではなくホスト側の関心。gear の tick は実時間で進めない
-  // (pin tick.discrete) ので、この時刻が走行の順序に混ざることはない。
+  // The timestamp is host-side concern, not Clock's. gear's tick cannot advance in
+  // wall-clock time (pin tick.discrete), so this timestamp does not mingle with the
+  // ordering of trips.
   const line = JSON.stringify({ at: new Date().toISOString(), ...event });
   appendFileSync(logFile, line + '\n', { mode: 0o600 });
   process.stdout.write(line + '\n');
 }
 
-// 乗客はまだ居ない。空の registry は「何も受け付けない機械」であって、
-// 受け付けたふりをする機械ではない —— 未登録の program は admission で落ちる。
+// There are no passengers yet. An empty registry is a machine that accepts nothing,
+// not one that pretends to accept — an unregistered program will fall through
+// admission.
 const programs = new Registry();
 
 record({ kind: 'starting', stateDir, fifo, programs: 0, pid: process.pid });
 
-// FIFO は書き手が全員閉じると EOF になる。常駐なので、そのたびに開き直す。
+// The FIFO becomes EOF once every writer closes it. Because this is a long-lived
+// daemon, reopen it each time.
 async function serve(): Promise<void> {
   for (;;) {
     const io = createReadStream(fifo, { encoding: 'utf8' });
