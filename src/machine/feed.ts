@@ -123,21 +123,21 @@ export class Feed {
     try {
       const data = Envelope.parse(JSON.parse(text) as unknown);
       const name = data.name == null ? '' : String(data.name);
-      if (name.length === 0) return this.#reject(text, 'name が無い');
+      if (name.length === 0) return this.#reject(text, 'name is missing');
       const kit = data.kit == null ? null : Kit.fromJSON(data.kit);
       let seed: number | null = null;
       if (data.seed != null) {
         if (typeof data.seed !== 'number' || !Number.isSafeInteger(data.seed)) {
-          throw new TypeError('seed は安全な整数にする');
+          throw new TypeError('seed must be a safe integer');
         }
         seed = data.seed;
       }
       return this.#accept({ name, focus: data.focus ?? {}, kit, seed });
     } catch (error) {
       if (error instanceof SyntaxError) {
-        return this.#reject(text, `JSON として読めない: ${error.message}`);
+        return this.#reject(text, `not readable as JSON: ${error.message}`);
       }
-      return this.#reject(text, `投入として受けられない: ${detail(error)}`);
+      return this.#reject(text, `not acceptable as a submission: ${detail(error)}`);
     }
   }
 
