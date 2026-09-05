@@ -120,7 +120,7 @@ describe('typed json boundary', () => {
       what: 'Submission focus',
       expected: /^\s+readonly focus: JsonValue;$/m,
       declaration: 'readonly focus: JsonValue;',
-      untyped: /^\s+readonly focus\??: unknown;$/m,
+      untyped: /^  readonly focus: unknown;$/m,
     },
     {
       file: 'src/machine/ledger.ts',

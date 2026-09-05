@@ -16,7 +16,7 @@ import { Clock, CLOCK_RANDOM_TAG, ClockRandomPayload } from '../clock/index.js';
 import type { Tick } from '../clock/tick.js';
 import type { Kit } from '../kit.js';
 import type { EntrySink, Log } from '../journal.js';
-import { normalizeJson } from '../json.js';
+import { normalizeJson, type JsonValue } from '../json.js';
 import type { Registry } from '../port/core.js';
 import { PROGRAM_SUBMIT_TAG } from '../tags.js';
 import { TooDeep, type Registry as ProgramRegistry } from '../program.js';
@@ -149,10 +149,10 @@ export class Driver {
   }
 
   /** This synchronous section is the bookkeeping lock in the single-threaded JS runtime. */
-  #admit(tag: string, payload: unknown, kit: Kit | null): readonly [Tick, VerdictValue] {
+  #admit(tag: string, payload: JsonValue, kit: Kit | null): readonly [Tick, VerdictValue] {
     if (this.#maxEffects !== null && this.#processed >= this.#maxEffects) throw new Suspend();
     const tick = this.#clock.advance();
-    const verdict = this.#authority.judge(new Request(tag, normalizeJson(payload)), kit);
+    const verdict = this.#authority.judge(new Request(tag, payload), kit);
     if (!verdict.denied) this.#processed += 1;
     return [tick, verdict] as const;
   }
