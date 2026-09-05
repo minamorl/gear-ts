@@ -1,7 +1,7 @@
 import { Entry, JournalWriteError, Log, PORT_RESULT, type EntrySink } from '../journal.js';
 import { normalizeJson } from '../json.js';
 import { Receipt, type ReceiptOutcome } from '../receipt.js';
-import type { VerdictValue } from '../admission/verdict.js';
+import type { Denied, VerdictValue } from '../admission/verdict.js';
 
 function errorName(error: unknown): string {
   if (error instanceof Error) return error.constructor.name || error.name || 'Error';
@@ -83,7 +83,7 @@ export class Recorder {
     readonly tick: number;
     readonly tag: string;
     readonly payload: unknown;
-    readonly verdict: VerdictValue & { readonly denied: true };
+     readonly verdict: Denied;
   }): void {
     this.#append(input.tick, 'admission_denied', {
       tag: input.tag,

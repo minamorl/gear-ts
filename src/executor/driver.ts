@@ -11,7 +11,7 @@ import {
 } from '@minamorl/berylx';
 import { Request } from '../admission/request.js';
 import type { Policy } from '../admission/policy.js';
-import type { VerdictValue } from '../admission/verdict.js';
+import type { Denied, VerdictValue } from '../admission/verdict.js';
 import { Clock, CLOCK_RANDOM_TAG, ClockRandomPayload } from '../clock/index.js';
 import type { Tick } from '../clock/tick.js';
 import type { Kit } from '../kit.js';
@@ -255,7 +255,7 @@ export class Driver {
     tick: Tick,
     tag: string,
     payload: unknown,
-    verdict: VerdictValue & { readonly denied: true },
+    verdict: Denied,
   ): never {
     this.#recorder.denial({ tick: tick.index, tag, payload, verdict });
     throw new AdmissionDenied(verdict);
