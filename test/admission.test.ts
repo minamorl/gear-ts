@@ -37,7 +37,7 @@ describe('Admission', () => {
   it('returns denial as a value rather than throwing', () => {
     const verdict = Admission.judge(shellRequest(), new Admission.DenyAll());
     expect(verdict).toBeInstanceOf(Admission.Denied);
-    expect(verdict).toMatchObject({ denied: true, admitted: false, reason: '既定拒否スタンス', by: 'deny_all' });
+    expect(verdict).toMatchObject({ denied: true, admitted: false, reason: 'default deny stance', by: 'deny_all' });
   });
 
   it('gives both verdict forms structured grounds', () => {
