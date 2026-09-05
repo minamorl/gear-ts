@@ -5,6 +5,8 @@ import {
   HOLE,
   holeNames,
   substitute,
+  tickSelected,
+  tagSet,
   type RoutineParameters,
   type TickSelection,
 } from '../routine.js';
@@ -38,17 +40,6 @@ export interface SliceOptions {
 export type RoutineRunOptions = RunOptions & {
   readonly params?: RoutineParameters;
 };
-
-function tickSelected(selection: TickSelection | undefined, tick: number): boolean {
-  if (selection === undefined) return true;
-  if (typeof selection === 'function') return selection(tick);
-  if ('has' in selection) return selection.has(tick);
-  return selection.includes(tick);
-}
-
-function tagSet(tags: SliceOptions['tags']): ReadonlySet<string> | undefined {
-  return tags === undefined ? undefined : new Set(Array.from(tags, String));
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
