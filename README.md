@@ -1,51 +1,47 @@
-# gear-ts
+# Gear
 
-**時間を進める機械。** berylx の program を、中断して再開できて、後から何が起きたか
-説明できる形で走らせる。
+[![CI](https://github.com/minamorl/gear-ts/actions/workflows/ci.yml/badge.svg)](https://github.com/minamorl/gear-ts/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@minamorl/gear)](https://www.npmjs.com/package/@minamorl/gear)
 
-作用はデータであり、journal だけが真である。
+Gear runs TypeScript workflows with explicit permissions, resumable effects, and an
+append-only execution journal. It builds on
+[Berylx](https://github.com/minamorl/berylx-ts) and validates program and port
+boundaries with [Zod](https://zod.dev/).
 
-Ruby 実装 [`minamorl/gear`](https://github.com/minamorl/gear) の TypeScript 移植。
-`prohibitions.pin@1.1` 面 C による Ruby 廃止を受けて移した。**移植であって作り直しではない。**
+Use it when you need to pause a workflow, resume it with recorded external results,
+or inspect why an operation was allowed or denied. Gear is an embedded runtime:
+your application decides when to accept work and when to advance it.
 
-## 五点セット
+## Install
 
-中核はこの五つだけで、これ以外を中核に増やさない。
-
-| | |
-|---|---|
-| **Clock** | 効果ひとつにつき 1 tick 進む離散した時間。乱数は tick に紐づく seed から取るので、実時刻もプロセス由来の乱数も走行に混ざらない。 |
-| **Admission** | 全ての副作用の手前に立つゲート。拒否は例外ではなく検査できる値として返る。判定基準は policy として差し替える。 |
-| **Executor** | berylx の program を darkcore の Effect 木として走らせる本体。予算 (`maxEffects`) で任意の一歩手前まで走らせて中断し、その journal を渡して再開できる。 |
-| **Journal** | 状態の正本。追記しかしない。現在状態はその畳み込みとして得る。記録済みの外界結果は再実行せず読み戻す。 |
-| **Receipt** | 実行された効果に必ず出る根拠。「何が起きたか」と「何が許可したか」を持ち、先行 receipt を指して鎖になる。 |
-
-## 層
-
-```
-darkcore = 作用の共通語彙 (単一 tagged effect)     -> berylx-ts が内包する
-berylx   = 接続の文法 (Task : Lay -> Result[Lay])  -> github:minamorl/berylx-ts
-gear     = 時間を進める機械                         -> ここ
+```sh
+npm install @minamorl/gear @minamorl/berylx zod
 ```
 
-## 使う
+Requires Node.js 20 or later. The package provides ECMAScript modules and TypeScript
+declarations. CI uses Node.js 22.
 
-外界は port adapter を通してしか触れない。素の Task は実行機に乗らない。
-権限は policy が覗くフィールドではなく、program へ渡す物 (Kit) として運ぶ。
+## A complete example
+
+Save this as `greet.mjs` and run `node greet.mjs` after installing the packages above.
 
 ```js
-import { Task } from '@minamorl/berylx';
-import { z } from 'zod';
+import { Task } from "@minamorl/berylx";
+import { z } from "zod";
 import {
-  Machine, PortAdapter, PortRegistry, ProgramRegistry, Kit,
-  PROGRAM_SUBMIT_TAG, projectView,
-} from '@minamorl/gear';
+  Kit,
+  Machine,
+  PortAdapter,
+  PortRegistry,
+  ProgramRegistry,
+  PROGRAM_SUBMIT_TAG,
+  projectView,
+} from "@minamorl/gear";
 
-// 1. 外界は port adapter を通る。境界の形は zod schema で名乗る。
-const GREET_TAG = 'greet_upcase';
+const GREET_TAG = "greet_upcase";
 const ports = new PortRegistry();
 ports.register(
-  new PortAdapter('greet').operation(
+  new PortAdapter("greet").operation(
     GREET_TAG,
     z.object({ name: z.string() }),
     z.object({ shout: z.string() }),
@@ -53,82 +49,154 @@ ports.register(
   ),
 );
 
-// 2. 素の Task は実行機に乗らない。名前と入出力を名乗って登録する。
 const programs = new ProgramRegistry().register({
-  name: 'greet',
-  task: Task.of('greet', (lay, io) =>
-    lay.put('shout', io.perform(GREET_TAG, { name: lay.at('name').fetch() }).shout)),
-  input: z.object({ name: z.string() }).describe('GreetIn'),
-  output: z.object({ shout: z.string() }).describe('GreetOut'),
+  name: "greet",
+  task: Task.of("greet", (lay, io) => {
+    const result = io.perform(GREET_TAG, { name: lay.at("name").fetch() });
+    return lay.put("shout", result.shout);
+  }),
+  input: z.object({ name: z.string() }).describe("GreetInput"),
+  output: z.object({ shout: z.string() }).describe("GreetOutput"),
 });
 
-// 3. 渡していない port も program も呼べない。迂回は policy の書き漏れでなく構造で塞がる。
-const kit = Kit.of({ ports: [GREET_TAG, PROGRAM_SUBMIT_TAG], programs: ['greet'], depth: 1 });
+const kit = Kit.of({
+  ports: [GREET_TAG, PROGRAM_SUBMIT_TAG],
+  programs: ["greet"],
+  depth: 1,
+});
 
 const machine = new Machine({ programs, ports });
-machine.submit({ name: 'greet', focus: { name: 'yui' }, kit });
+machine.submit({ name: "greet", focus: { name: "Ada" }, kit });
 const [done] = await machine.drain();
 
-console.log(done.produced);                                 // { name: 'yui', shout: 'HELLO, YUI' }
-console.log(done.outcome.receipts.length);                  // 2
-console.log(projectView(done.outcome.journal).toJSON());
+console.log(JSON.stringify(done.produced));
+console.log(done.outcome.receipts.length);
+console.log(projectView(done.outcome.journal).toJSON().last_tick);
 ```
 
-最後の行が出す journal の眺め:
+Output:
 
-```json
-{
-  "last_tick": 2,
-  "effects": [{ "tick": 2, "port": "greet_upcase" }],
-  "denials": [],
-  "receipts": [
-    { "tick": 2, "id": "d9f2d7492748dfff", "tag": "greet_upcase", "predecessor": null },
-    { "tick": 1, "id": "d5650040a13b5091", "tag": "program_submit", "predecessor": "d9f2d7492748dfff" }
-  ]
-}
+```text
+{"name":"Ada","shout":"HELLO, ADA"}
+2
+2
 ```
 
-receipt の `id` は tick・効果・結果・根拠を合わせた内容の SHA なので、admission の根拠が変われば id も変わる。上は実行して得た実測値である。
+The two receipts cover the program submission and its greeting effect. Program
+schemas need `.describe()` labels so recorded boundaries have stable names. Use
+`PortAdapter.asyncOperation()` and Berylx `AsyncTask` for asynchronous operations.
 
-`Kit.of({ ports: [], programs: [], depth: 0 })` を渡すと同じ program は走らない。
-`produced` は `null`、`receipts` は空、`denials` に拒否した tick と理由が 1 件残る。
-拒否も走行の記録であって、握り潰される失敗ではない。
+## Execution and permissions
 
-`Machine` は呼ばれた分だけ進む。内側に実時刻を待つ loop を持たないので、暗黙の実時間が
-走行へ混ざらない。実時間で起こすのは埋め込む側の仕事である。
+`submit()` records a submission without running it. `step()` executes one queued
+item; `drain()` executes queued items until the queue is empty or its `limit` is
+reached. An empty queue makes `step()` return `undefined`.
 
-## 入れる
+A `Kit` declares which port tags and program names a submission may use, together
+with its remaining program-call depth. A top-level program submission needs
+`PROGRAM_SUBMIT_TAG`, the program name, and a positive depth. `kit.narrow()` and
+`kit.descend()` can reduce this authority. An optional admission `policy` can
+restrict it further.
 
-npm には未公開なので git 依存で参照する。
+Programs and adapters are trusted application code. Kit controls operations sent
+through Gear; it does not sandbox arbitrary JavaScript. The default port registry
+includes shell, HTTP, and wall-clock adapters. Pass an explicit `PortRegistry`, as
+in the example, to select the operations available to your application.
 
-```json
-"dependencies": {
-  "@minamorl/gear": "github:minamorl/gear-ts"
-}
+Continue the example with an empty kit to inspect a denial:
+
+```js
+machine.submit({ name: "greet", focus: { name: "Ada" }, kit: Kit.nothing() });
+const [denied] = await machine.drain();
+console.log(denied.denied); // true
+console.log(denied.produced); // null
+console.log(projectView(denied.outcome.journal).toJSON().denials.length); // 1
 ```
 
-`@minamorl/berylx` も同様に git 依存で参照している。npm 公開版は 0.2.0 のままで、
-gear が要る `ControlSignal` / `Perform` / `effectful()` を含まないため。
+## Pause and resume
 
-Node 20 以上。
+An effect budget stops execution before an operation would exceed `maxEffects`.
+Resume the same ticket to continue from its journal:
 
-## 開発
+```js
+const resumable = new Machine({ programs, ports });
+const submission = resumable.submit({
+  name: "greet",
+  focus: { name: "Ada" },
+  kit,
+});
+const paused = await resumable.step({ maxEffects: 1 });
+console.log(paused.suspended); // true
 
-```bash
-pnpm install
-pnpm run check   # build + typecheck + test
+const resumed = await resumable.resume(submission.ticket);
+console.log(resumed.suspended); // false
+console.log(JSON.stringify(resumed.produced)); // {"name":"Ada","shout":"HELLO, ADA"}
 ```
 
-## 常駐
+Recorded external results are read back during replay. A different port or request,
+or a result that no longer fits its schema, fails replay instead of silently using
+incompatible history. Keep the program definitions and schemas compatible with
+the journals you intend to resume.
 
-FIFO host を `dist/bin/host.js` に持つ。核へ外から到達する経路は作らないので、
-HTTP は listen しない。配備手順は `deploy/README.md`。
+## Journal, receipts, and persistence
 
-## 正本
+| Component | Responsibility                                                                 |
+| --------- | ------------------------------------------------------------------------------ |
+| Clock     | Discrete ticks and deterministic random values derived from the run seed.      |
+| Admission | Check permissions before an effect executes and record denials.                |
+| Executor  | Run Berylx programs, suspend at an effect budget, and replay recorded results. |
+| Journal   | Append-only records of execution and external results.                         |
+| Receipt   | Record an effect's outcome, admission grounds, and predecessor link.           |
 
-コードと spec が食い違ったら spec が勝つ。spec は別リポジトリ `spec-system` の
-`pins/domains/gear.spec` にあり、この repo には含まれない。
+`projectView(journal)` derives a view from the journal. `Routine.fromJournal()` can
+reconstruct a reusable sequence of recorded effects. The root package also exports
+the lower-level `Executor`, `Journal`, `Admission`, `Routine`, and `View` APIs.
+
+Memory is the default storage. To persist a Machine, pass `stateDir`:
+
+```js
+const persistent = new Machine({ programs, ports, stateDir: "./gear-state" });
+```
+
+A new Machine using the same directory restores its intake, ledger, and per-ticket
+journals. Keep this directory outside disposable builds and use one writer per
+directory. Persistence does not make an external operation and a journal write a
+single transaction; adapters still need an appropriate recovery or idempotency
+strategy for a crash between those operations.
+
+## FIFO host
+
+The package includes the Unix-oriented `gear-host` executable. It requires
+`GEAR_STATE_DIR`, creates an `intake` FIFO there using `mkfifo`, and writes host
+events to stdout and `host.log`. Submissions are newline-delimited JSON objects
+with `name`, `focus`, `kit`, and an optional integer `seed`.
+
+The supplied host starts with an empty program registry. It cannot execute useful
+application work until you register application programs in `src/bin/host.ts` and
+build your deployment. It is a starting point for an application host, not a
+remotely configurable workflow service. It does not expose an HTTP server.
+
+[Linux deployment instructions](https://github.com/minamorl/gear-ts/blob/main/deploy/README.md)
+cover the user systemd service, immutable releases, health checks, and rollback.
+The host's wall-clock log timestamps are separate from the execution clock.
+
+## Development
+
+```sh
+git clone https://github.com/minamorl/gear-ts.git
+cd gear-ts
+npm ci
+npm run format:check
+npm run check
+```
+
+`check` runs type-checking, tests, and a build. `prepare` builds the package after a
+development install and before packing. CI repeats the checks on pull requests
+and pushes to `main`.
+
+Releases use Release Please and publish to npm from GitHub Actions with provenance.
+See [the release guide](https://github.com/minamorl/gear-ts/blob/main/.github/RELEASING.md).
 
 ## License
 
-MIT
+[MIT](LICENSE).

@@ -3,10 +3,10 @@ Description=Gear FIFO host
 
 [Service]
 Type=simple
-WorkingDirectory=/home/minamorl/deploy/gear/current
+WorkingDirectory=%h/deploy/gear/current
 Environment=NODE_ENV=production
-Environment=GEAR_STATE_DIR=/home/minamorl/deploy/gear/shared
-EnvironmentFile=/home/minamorl/deploy/gear/current/.env
+Environment=GEAR_STATE_DIR=%h/deploy/gear/shared
+EnvironmentFile=%h/deploy/gear/current/.env
 ExecStart=/usr/bin/node dist/bin/host.js
 Restart=always
 RestartSec=5

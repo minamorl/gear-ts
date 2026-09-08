@@ -1,22 +1,3 @@
-// ==================================================================
-// Host — a shell for setting gear up as a "resident of a separate process."
-//
-// Position of gear.spec:
-//   pin runtime.in_language        : gear.runtime.form = in_language_runtime
-//   pin runtime.not_a_daemon_core  : forbid gear.runtime.form = separate_process_daemon_core
-//   free machine.hosting           : supervision when a Machine is set up as
-//                                    a resident of a separate process
-//                                    (startup · restart · multi-Machine) shape undecided
-//
-// What is forbidden is "making the core a daemon," not "setting it up as a resident."
-// Host is only a shell that holds the Machine **as an in-language runtime**, and does not
-// create any path to RPC to the core from the outside. Submissions enter in-process
-// via the Intake queue, one raw data line at a time through Feed, per pin ui.transport_core_in_process.
-//
-// There is no Ruby equivalent (no bin/ or executables in the gear gem). So this is
-// not a port but a new piece, and the only face that cannot be answer-checked
-// against Ruby.
-// ==================================================================
 import { Err } from '@minamorl/berylx';
 import { Machine } from './machine.js';
 import { Feed } from './machine/feed.js';
@@ -25,7 +6,7 @@ import type { Registry as ProgramRegistry } from './program.js';
 export interface HostOptions {
   /** Where raw one-item-per-line data streams in. FIFO or stdin are both fine. */
   readonly io: NodeJS.ReadableStream;
-  /** Programs that may be dispatched. May be empty if there are no passengers (a Machine that accepts nothing). */
+  /** Programs available for dispatch. An empty registry cannot run submissions. */
   readonly programs: ProgramRegistry;
   /** Where Machine ledger and per-ticket journals live, when provided. */
   readonly stateDir?: string;
@@ -45,20 +26,14 @@ export type HostEvent =
       readonly denied: boolean;
       /** The outcome of the run itself. ok / err / suspended. */
       readonly outcome: 'ok' | 'err' | 'suspended';
-      /** The reason if err. A resident can't be peeped from outside, so do not leave this empty. */
+      /** The execution error, when the outcome is err. */
       readonly error?: string;
       readonly receipts: number;
       readonly lastTick: number;
     }
   | { readonly kind: 'stopped'; readonly accepted: number; readonly completed: number };
 
-/**
- * Submits received lines to the Machine and advances them until they finish.
- *
- * Feed#absorb does not return until io closes, so submissions and executions are interleaved.
- * The run itself is the Machine's own in-language runtime, and Host does not take the side
- * of advancing the tick (that is Machine#drain).
- */
+/** Reads submissions one at a time and drains the Machine after each one. */
 export class Host {
   readonly machine: Machine;
   readonly #feed: Feed;
@@ -80,13 +55,7 @@ export class Host {
     this.#stopping = true;
   }
 
-  /**
-   * Runs until io closes.
-   *
-   * Absorbs one line at a time and drains the intake queue each time. If you absorbed in bulk
-   * and ran in bulk, the correspondence between "submitted order" and "run order" would become
-   * hard to read from the journal.
-   */
+  /** Runs until the input closes or a stop request is observed. */
   async run(): Promise<{ readonly accepted: number; readonly completed: number }> {
     // A previous process may have durably accepted an item before it could pick it up.
     await this.#drain();
@@ -114,8 +83,6 @@ export class Host {
     for (const completion of completions) {
       this.#completed += 1;
       const outcome = completion.outcome;
-      // Reporting only "completed" would make it impossible to distinguish a failed run from a successful one.
-      // A resident cannot be peeped from outside, so always leave the outcome type and reason here.
       const failed = outcome.result instanceof Err;
       this.#report({
         kind: 'completed',

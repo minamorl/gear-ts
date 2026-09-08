@@ -147,7 +147,6 @@ export class Log implements Iterable<Entry> {
 
 type DecodedLine = { readonly line: number; readonly value: unknown };
 
-// Intentionally local and small: Journal owns NDJSON framing and diagnostics.
 function parseNdjson(text: string): DecodedLine[] {
   const decoded: DecodedLine[] = [];
   const lines = text.split(/\r?\n/u);

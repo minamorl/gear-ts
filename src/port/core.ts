@@ -106,7 +106,7 @@ export class Adapter {
         `${this.name}#${tag} payload is invalid: ${formatIssues(checked.error)}`,
       );
     }
-    return Darkcore.op(tag, normalized);
+    return Darkcore.op(tag, normalized, (value) => value);
   }
 
   handlers(interpret: OperationInterpreter): Darkcore.AsyncHandlerMap {

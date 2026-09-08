@@ -11,7 +11,7 @@ import type { Registry } from '../port/core.js';
 
 function recordedRequest(entry: Entry): unknown {
   if ('request' in entry.payload) return entry.payload.request;
-  // Ruby journals used `payload`; accepting it keeps withdrawal artifacts replayable.
+  // Older journals used `payload` for the recorded request.
   return entry.payload.payload;
 }
 
