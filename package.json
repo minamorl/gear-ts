@@ -23,14 +23,18 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm run build && pnpm run typecheck && pnpm run test"
+    "check": "npm run typecheck && npm test && npm run build",
+    "format:check": "prettier --check package.json package-lock.json tsconfig.json release-please-config.json .release-please-manifest.json README.md deploy/README.md \".github/workflows/*.yml\" .github/RELEASING.md",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run format:check && npm run check"
   },
   "dependencies": {
-    "@minamorl/berylx": "github:minamorl/berylx-ts#c6436986ed23ada2710bd31214035324e721ec2a",
+    "@minamorl/berylx": "^0.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
+    "prettier": "3.6.2",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
@@ -38,7 +42,16 @@
   "bin": {
     "gear-host": "dist/bin/host.js"
   },
-  "description": "An execution machine for TypeScript: Clock, Admission, Executor, Journal, Receipt. Effects are data; the journal is the only truth.",
+  "description": "A journal-backed TypeScript runtime for admitted, resumable effects and auditable execution.",
+  "homepage": "https://github.com/minamorl/gear-ts#readme",
+  "bugs": {
+    "url": "https://github.com/minamorl/gear-ts/issues"
+  },
+  "author": "minamorl",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/minamorl/gear-ts.git"

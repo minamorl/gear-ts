@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "23eb2cf5c5c9dbbd7b8c6bc9c3ae99a611008b3a",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "@minamorl/gear",
+      "include-component-in-tag": false,
+      "initial-version": "0.1.0",
+      "extra-files": ["src/version.ts"]
+    }
+  }
+}

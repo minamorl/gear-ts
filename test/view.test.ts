@@ -57,7 +57,7 @@ async function ranJournal(allowed: readonly string[] = ['double']): Promise<Jour
   return completion.outcome.journal;
 }
 
-describe('View (Ruby view_test.rb 7-test parity)', () => {
+describe('View', () => {
   it('projects exact effect, denial, and receipt fields from a fresh journal fold', async () => {
     const journal = await ranJournal();
     const projection = View.project(journal);

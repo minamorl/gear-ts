@@ -60,8 +60,6 @@ describe('substrate integration', () => {
     const adapter = probeAdapter(calls);
     const tree = EffectTree.build(probeTask('pending_probe', 'value', 7), {});
 
-    // TS Darkcore has no public Pending/step. The observable boundary is the unhandled
-    // Effect value before fold, followed by the same value interpreted at fold.
     expect(tree).toBeInstanceOf(Darkcore.Effect);
     expect(tree.tag).toBe(EffectTree.TASK);
     expect(calls).toEqual([]);

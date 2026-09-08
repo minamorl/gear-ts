@@ -3,8 +3,9 @@
 set -euo pipefail
 umask 077
 
-SOURCE_REPO="${GEAR_SOURCE_REPO:-/home/minamorl/repos/gear-ts}"
-DEPLOY_ROOT="${GEAR_DEPLOY_ROOT:-/home/minamorl/deploy/gear}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SOURCE_REPO="${GEAR_SOURCE_REPO:-$(cd -- "${SCRIPT_DIR}/.." && pwd -P)}"
+DEPLOY_ROOT="${GEAR_DEPLOY_ROOT:-${HOME:?HOME is required}/deploy/gear}"
 RELEASES_DIR="${DEPLOY_ROOT}/releases"
 CURRENT_LINK="${DEPLOY_ROOT}/current"
 STATE_DIR="${DEPLOY_ROOT}/shared"
@@ -13,8 +14,8 @@ ENV_FILE="${SOURCE_REPO}/.env"
 SERVICE_NAME="gear-host.service"
 DEPLOY_REF="${1:-${GEAR_DEPLOY_REF:-origin/main}}"
 KEEP_RELEASES="${GEAR_KEEP_RELEASES:-3}"
-PNPM_BIN="/usr/bin/pnpm"
-NODE_BIN="/usr/bin/node"
+NPM_BIN="${GEAR_NPM_BIN:-/usr/bin/npm}"
+NODE_BIN="${GEAR_NODE_BIN:-/usr/bin/node}"
 READY_ARTIFACT="dist/bin/host.js"
 READY_MARKER=".gear-release-ready"
 HEALTH_ATTEMPTS=40
@@ -24,9 +25,9 @@ STAGING_DIR=""
 NEXT_LINK=""
 ROLLBACK_LINK=""
 
-# package.json scripts invoke `pnpm`; keep them on the measured, Node-20-safe
-# system binary rather than the incompatible user-level pnpm found on Vultr.
-export PATH="/usr/bin:/bin:${PATH:-}"
+# npm scripts use the selected Node installation.
+PATH="$(dirname -- "${NODE_BIN}"):$(dirname -- "${NPM_BIN}"):/usr/bin:/bin:${PATH:-}"
+export PATH
 
 fail() {
   echo "[deploy-gear] FATAL: $*" >&2
@@ -45,7 +46,7 @@ cleanup() {
   fi
 }
 
-trap cleanup EXIT
+trap 'cleanup' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -140,14 +141,15 @@ prune_old_releases() {
 
 require_safe_absolute_path SOURCE_REPO "${SOURCE_REPO}"
 require_safe_absolute_path DEPLOY_ROOT "${DEPLOY_ROOT}"
-[ -x "${PNPM_BIN}" ] || fail "pnpm not executable: ${PNPM_BIN}"
+[ -x "${NPM_BIN}" ] || fail "npm not executable: ${NPM_BIN}"
 [ -x "${NODE_BIN}" ] || fail "node not executable: ${NODE_BIN}"
 
 case "${KEEP_RELEASES}" in
   ''|*[!0-9]*|0) fail "GEAR_KEEP_RELEASES must be a positive integer" ;;
 esac
 
-[ -d "${SOURCE_REPO}/.git" ] || fail "source repository not found: ${SOURCE_REPO}"
+git -C "${SOURCE_REPO}" rev-parse --git-dir >/dev/null 2>&1 \
+  || fail "source repository not found: ${SOURCE_REPO}"
 [ -f "${ENV_FILE}" ] || fail "canonical environment file not found: ${ENV_FILE}"
 ENV_MODE="$(stat -Lc '%a' -- "${ENV_FILE}")"
 [ "${ENV_MODE}" = "600" ] \
@@ -207,9 +209,9 @@ else
   ln -s -- "${ENV_FILE}" "${STAGING_DIR}/.env"
 
   echo "[deploy-gear] installing dependencies"
-  (cd "${STAGING_DIR}" && "${PNPM_BIN}" install)
+  (cd "${STAGING_DIR}" && "${NPM_BIN}" ci)
   echo "[deploy-gear] building release"
-  (cd "${STAGING_DIR}" && "${PNPM_BIN}" run build)
+  (cd "${STAGING_DIR}" && "${NPM_BIN}" run build)
 
   [ -f "${STAGING_DIR}/${READY_ARTIFACT}" ] \
     && [ ! -L "${STAGING_DIR}/${READY_ARTIFACT}" ] \

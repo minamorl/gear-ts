@@ -19,7 +19,7 @@ class TagAllowlist implements Admission.Policy {
   }
 }
 
-const shellRequest = () => Admission.Request.fromEffect(Darkcore.op('shell', { cmd: 'ls' }));
+const shellRequest = () => Admission.Request.fromEffect(Darkcore.op('shell', { cmd: 'ls' }, (value) => value));
 
 describe('Admission', () => {
   it('builds an inspectable request from an unexecuted effect', () => {
@@ -67,7 +67,7 @@ describe('Admission', () => {
 
   it('does not invent a policy or hardcode domain tags', () => {
     expect(() => Admission.judge(shellRequest(), undefined as never)).toThrow();
-    const http = Admission.Request.fromEffect(Darkcore.op('http', { url: 'x' }));
+    const http = Admission.Request.fromEffect(Darkcore.op('http', { url: 'x' }, (value) => value));
     expect(Admission.judge(shellRequest(), new Admission.AllowAll()).admitted).toBe(true);
     expect(Admission.judge(http, new Admission.AllowAll()).admitted).toBe(true);
     expect(Admission.judge(shellRequest(), new Admission.DenyAll()).denied).toBe(true);
@@ -75,7 +75,7 @@ describe('Admission', () => {
   });
 
   it('judges an effect directly before execution', () => {
-    const verdict = Admission.judgeEffect(Darkcore.op('shell', { cmd: 'ls' }), new TagAllowlist('shell'));
+    const verdict = Admission.judgeEffect(Darkcore.op('shell', { cmd: 'ls' }, (value) => value), new TagAllowlist('shell'));
     expect(verdict).toMatchObject({ admitted: true, request: { tag: 'shell' } });
   });
 

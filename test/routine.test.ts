@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Err, Ok, Task, type BerylxNode } from '@minamorl/berylx';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -71,7 +72,7 @@ async function record(program: BerylxNode, registry: PortRegistry, seed = 1) {
   return Executor.run(program, { policy: allow(), seed, registry });
 }
 
-describe('Routine (Ruby routine_test.rb 8-test parity)', () => {
+describe('Routine', () => {
   it('restores a routine from a real run', async () => {
     const out = await record(twoProbes(), registryWithProbe([]));
 
@@ -273,7 +274,7 @@ describe('Routine (Ruby routine_test.rb 8-test parity)', () => {
 
     const out = await routine.run({ policy: allow(), seed: 1 });
 
-    expect(VERSION).toBe('0.0.1');
+    expect(VERSION).toBe(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
     expect(out.result).toBeInstanceOf(Ok);
     expect(out.receipts).toEqual([]);
     expect(out.lastTick).toBe(0);

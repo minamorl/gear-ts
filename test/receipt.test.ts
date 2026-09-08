@@ -14,7 +14,7 @@ class DummyVerdict {
   }
 }
 
-const sampleEffect = () => Darkcore.op('fs_write', { path: '/tmp/x', bytes: 3 });
+const sampleEffect = () => Darkcore.op('fs_write', { path: '/tmp/x', bytes: 3 }, (value) => value);
 const sampleVerdict = () => new DummyVerdict(true, 'fs.write.allow', ['within sandbox']);
 
 describe('Receipt', () => {

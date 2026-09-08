@@ -106,7 +106,7 @@ describe('Port', () => {
     const interpret = vi.fn(() => ({ ok: true }));
 
     await expect(
-      Darkcore.runAsync(Darkcore.op('guarded_probe', { n: 'bad' }), adapter.handlers(interpret)),
+      Darkcore.runAsync(Darkcore.op('guarded_probe', { n: 'bad' }, (value) => value), adapter.handlers(interpret)),
     ).rejects.toBeInstanceOf(Port.InvalidPayload);
     expect(interpret).not.toHaveBeenCalled();
   });
