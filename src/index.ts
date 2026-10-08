@@ -2,6 +2,13 @@ export { PROGRAM_SUBMIT_TAG } from './tags.js';
 
 export { VERSION } from './version.js';
 export { normalizeJson } from './json.js';
+export { createShadowGear } from './embed.js';
+export type {
+  ShadowEffect,
+  ShadowEffectKind,
+  ShadowGear,
+  ShadowGearOptions,
+} from './embed.js';
 
 export * as Executor from './executor.js';
 export {
