@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { normalizeJson, type JsonValue } from '../json.js';
-import { Kit, type KitDeclaration } from '../kit.js';
+import { z } from "zod";
+import { normalizeJson, type JsonValue } from "../json.js";
+import { Kit, type KitDeclaration } from "../kit.js";
 
 const SubmissionRecordSchema = z.object({
   ticket: z.number().int().positive(),
@@ -27,7 +27,8 @@ export interface SubmissionRecord {
 }
 
 function safeInteger(value: number, label: string): number {
-  if (!Number.isSafeInteger(value)) throw new TypeError(`${label} must be a safe integer`);
+  if (!Number.isSafeInteger(value))
+    throw new TypeError(`${label} must be a safe integer`);
   return value;
 }
 
@@ -46,12 +47,13 @@ export class Submission {
     readonly kit: Kit | null;
     readonly seed: number;
   }) {
-    this.ticket = safeInteger(input.ticket, 'ticket');
+    this.ticket = safeInteger(input.ticket, "ticket");
     this.name = String(input.name);
-    if (this.name.length === 0) throw new TypeError('program name must not be empty');
+    if (this.name.length === 0)
+      throw new TypeError("program name must not be empty");
     this.focus = normalizeJson(input.focus);
     this.kit = input.kit;
-    this.seed = safeInteger(input.seed, 'seed');
+    this.seed = safeInteger(input.seed, "seed");
     Object.freeze(this);
   }
 
@@ -124,7 +126,14 @@ export class Intake {
   }
 
   advanceTo(ticket: number): void {
-    const carried = safeInteger(Number(ticket), 'ticket');
+    const carried = safeInteger(Number(ticket), "ticket");
     this.#issued = Math.max(this.#issued, carried);
+  }
+  /** Remove an unrecorded submission after a persistence failure. */
+  discard(ticket: number): void {
+    const position = this.#queue.findIndex(
+      (submission) => submission.ticket === ticket,
+    );
+    if (position >= 0) this.#queue.splice(position, 1);
   }
 }

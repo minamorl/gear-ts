@@ -1,13 +1,20 @@
-import { AsyncTask, Err, Ok } from '@minamorl/berylx';
-import { AllowAll, type Policy } from './admission/policy.js';
-import { run, type Outcome } from './executor.js';
-import { Log } from './journal.js';
-import { PROGRAM_SUBMIT_TAG } from './tags.js';
-import { registry as defaultRegistry, type Registry as PortRegistry } from './port/index.js';
-import type { Registry as ProgramRegistry } from './program.js';
-import { Feed } from './machine/feed.js';
-import { Intake, Submission, type SubmissionOptions } from './machine/intake.js';
-import { FileStore } from './machine/store.js';
+import { AsyncTask, Err, Ok } from "@minamorl/berylx";
+import { AllowAll, type Policy } from "./admission/policy.js";
+import { run, type Outcome } from "./executor.js";
+import { Log } from "./journal.js";
+import { PROGRAM_SUBMIT_TAG } from "./tags.js";
+import {
+  registry as defaultRegistry,
+  type Registry as PortRegistry,
+} from "./port/index.js";
+import type { Registry as ProgramRegistry } from "./program.js";
+import { Feed } from "./machine/feed.js";
+import {
+  Intake,
+  Submission,
+  type SubmissionOptions,
+} from "./machine/intake.js";
+import { FileStore } from "./machine/store.js";
 import {
   ACCEPTED,
   COMPLETED,
@@ -15,7 +22,7 @@ import {
   Ledger,
   SUSPENDED,
   type LedgerKind,
-} from './machine/ledger.js';
+} from "./machine/ledger.js";
 
 export interface MachineOptions {
   readonly programs: ProgramRegistry;
@@ -57,9 +64,11 @@ export class Completion {
 
   get produced(): Record<string, unknown> | null {
     if (this.suspended || !(this.outcome.result instanceof Ok)) return null;
-    const value = (this.outcome.result.focus.toObject() as Record<string, unknown>).produced;
-    return value !== null && typeof value === 'object' && !Array.isArray(value)
-      ? value as Record<string, unknown>
+    const value = (
+      this.outcome.result.focus.toObject() as Record<string, unknown>
+    ).produced;
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
       : null;
   }
 }
@@ -78,13 +87,20 @@ export class Machine {
     this.#ports = options.ports ?? defaultRegistry;
     this.#policy = options.policy ?? new AllowAll();
     if (options.stateDir !== undefined && options.store !== undefined) {
-      throw new TypeError('stateDir and store are mutually exclusive');
+      throw new TypeError("stateDir and store are mutually exclusive");
     }
-    this.#store = options.store ?? (options.stateDir === undefined
-      ? undefined
-      : new FileStore(options.stateDir));
-    if (this.#store !== undefined && (options.intake !== undefined || options.ledger !== undefined)) {
-      throw new TypeError('persistent Machine restores its own intake and ledger');
+    this.#store =
+      options.store ??
+      (options.stateDir === undefined
+        ? undefined
+        : new FileStore(options.stateDir));
+    if (
+      this.#store !== undefined &&
+      (options.intake !== undefined || options.ledger !== undefined)
+    ) {
+      throw new TypeError(
+        "persistent Machine restores its own intake and ledger",
+      );
     }
     if (this.#store === undefined) {
       this.intake = options.intake ?? new Intake();
@@ -98,14 +114,33 @@ export class Machine {
   }
 
   static denied(outcome: Outcome): boolean {
-    return outcome.result instanceof Err &&
-      outcome.journal.toArray().some((entry) => entry.kind === 'admission_denied');
+    return (
+      outcome.result instanceof Err &&
+      outcome.journal
+        .toArray()
+        .some((entry) => entry.kind === "admission_denied")
+    );
   }
 
   /** Accept and record only. Admission happens later when step picks the item up. */
   submit(options: SubmissionOptions): Submission {
+    const reserved = this.#store?.reserveTicket(this.intake.issued);
+    if (reserved !== undefined) this.intake.advanceTo(reserved - 1);
     const submission = this.intake.offer(options);
-    this.ledger.append({ ticket: submission.ticket, kind: ACCEPTED, payload: submission.toJSON() });
+    if (reserved !== undefined && submission.ticket !== reserved) {
+      this.intake.discard(submission.ticket);
+      throw new Error("Reserved ticket differs from issued ticket");
+    }
+    try {
+      this.ledger.append({
+        ticket: submission.ticket,
+        kind: ACCEPTED,
+        payload: submission.toJSON(),
+      });
+    } catch (error) {
+      this.intake.discard(submission.ticket);
+      throw error;
+    }
     return submission;
   }
 
@@ -126,10 +161,18 @@ export class Machine {
     return completed;
   }
 
-  async resume(ticket: number, options: AdvanceOptions = {}): Promise<Completion> {
+  async resume(
+    ticket: number,
+    options: AdvanceOptions = {},
+  ): Promise<Completion> {
     const journal = this.ledger.journalFor(ticket);
-    if (journal === undefined) throw new Error(`ticket ${ticket} has no run to continue`);
-    return this.#launch(this.#submissionOf(ticket), journal, options.maxEffects ?? null);
+    if (journal === undefined)
+      throw new Error(`ticket ${ticket} has no run to continue`);
+    return this.#launch(
+      this.#submissionOf(ticket),
+      journal,
+      options.maxEffects ?? null,
+    );
   }
 
   get pending(): number {
@@ -145,12 +188,19 @@ export class Machine {
   }
 
   #submissionOf(ticket: number): Submission {
-    const accepted = this.ledger.forTicket(ticket).find((record) => record.kind === ACCEPTED);
-    if (accepted === undefined) throw new Error(`ticket ${ticket} has no intake record`);
+    const accepted = this.ledger
+      .forTicket(ticket)
+      .find((record) => record.kind === ACCEPTED);
+    if (accepted === undefined)
+      throw new Error(`ticket ${ticket} has no intake record`);
     return Submission.fromRecord(accepted.payload);
   }
 
-  async #launch(submission: Submission, journal: Log, maxEffects: number | null): Promise<Completion> {
+  async #launch(
+    submission: Submission,
+    journal: Log,
+    maxEffects: number | null,
+  ): Promise<Completion> {
     const writer = this.#store?.writer(submission.ticket, journal);
     try {
       const outcome = await run(this.#entryProgram(submission), {
@@ -167,7 +217,8 @@ export class Machine {
       this.#record(submission.ticket, outcome);
       return new Completion(submission.ticket, outcome);
     } catch (error) {
-      if (writer !== undefined) this.ledger.remember(submission.ticket, writer.journal);
+      if (writer !== undefined)
+        this.ledger.remember(submission.ticket, writer.journal);
       throw error;
     }
   }
@@ -175,13 +226,17 @@ export class Machine {
   #entryProgram(submission: Submission): AsyncTask {
     const payload = { name: submission.name, focus: submission.focus };
     return AsyncTask.of(`pickup_${submission.ticket}`, async (lay, io) =>
-      lay.put('produced', await io.perform(PROGRAM_SUBMIT_TAG, payload)),
+      lay.put("produced", await io.perform(PROGRAM_SUBMIT_TAG, payload)),
     );
   }
 
   #record(ticket: number, outcome: Outcome): void {
     this.ledger.remember(ticket, outcome.journal);
-    this.ledger.append({ ticket, kind: this.#kindOf(outcome), payload: this.#summary(outcome) });
+    this.ledger.append({
+      ticket,
+      kind: this.#kindOf(outcome),
+      payload: this.#summary(outcome),
+    });
   }
 
   #kindOf(outcome: Outcome): LedgerKind {
@@ -191,13 +246,17 @@ export class Machine {
   }
 
   #summary(outcome: Outcome): Record<string, unknown> {
-    const denial = outcome.journal.toArray().filter((entry) => entry.kind === 'admission_denied').at(-1);
+    const denial = outcome.journal
+      .toArray()
+      .filter((entry) => entry.kind === "admission_denied")
+      .at(-1);
     const summary: Record<string, unknown> = {
       receipts: outcome.receipts.length,
       last_tick: outcome.lastTick,
       suspended: outcome.suspended,
     };
-    if (denial?.payload.reason !== undefined) summary.reason = denial.payload.reason;
+    if (denial?.payload.reason !== undefined)
+      summary.reason = denial.payload.reason;
     return summary;
   }
 }

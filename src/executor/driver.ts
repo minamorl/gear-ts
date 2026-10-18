@@ -8,28 +8,37 @@ import {
   type BerylxNode,
   type Focus,
   type Result,
-} from '@minamorl/berylx';
-import { Request } from '../admission/request.js';
-import type { Policy } from '../admission/policy.js';
-import type { Denied, VerdictValue } from '../admission/verdict.js';
-import { Clock, CLOCK_RANDOM_TAG, ClockRandomPayload } from '../clock/index.js';
-import type { Tick } from '../clock/tick.js';
-import type { Kit } from '../kit.js';
-import type { EntrySink, Log } from '../journal.js';
-import { normalizeJson, type JsonValue } from '../json.js';
-import type { Registry } from '../port/core.js';
-import { PROGRAM_SUBMIT_TAG } from '../tags.js';
-import { TooDeep, type Registry as ProgramRegistry } from '../program.js';
-import { AdmissionDenied, Outcome, Suspend, focusWithKit } from '../executor.js';
-import { Authority } from './authority.js';
-import { Recorder } from './recorder.js';
-import { Replay } from './replay.js';
-import { Submission } from './submission.js';
+} from "@minamorl/berylx";
+import { Request } from "../admission/request.js";
+import type { Policy } from "../admission/policy.js";
+import type { Denied, VerdictValue } from "../admission/verdict.js";
+import { Clock, CLOCK_RANDOM_TAG, ClockRandomPayload } from "../clock/index.js";
+import type { Tick } from "../clock/tick.js";
+import type { Kit } from "../kit.js";
+import type { EntrySink, Log } from "../journal.js";
+import { normalizeJson, type JsonValue } from "../json.js";
+import type { Registry } from "../port/core.js";
+import { PROGRAM_SUBMIT_TAG } from "../tags.js";
+import { TooDeep, type Registry as ProgramRegistry } from "../program.js";
+import {
+  AdmissionDenied,
+  Outcome,
+  Suspend,
+  focusWithKit,
+} from "../executor.js";
+import { Authority } from "./authority.js";
+import { Recorder } from "./recorder.js";
+import { Replay } from "./replay.js";
+import { Submission } from "./submission.js";
 
 type Obtained = readonly [value: unknown, recorded: unknown, external: boolean];
 
 function promiseLike<T>(value: unknown): value is Promise<T> {
-  return value !== null && typeof value === 'object' && typeof (value as Promise<T>).then === 'function';
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as Promise<T>).then === "function"
+  );
 }
 
 function errorRethrow(error: unknown): never {
@@ -69,7 +78,7 @@ export class Driver {
     this.#real = options.registry.realHandlers();
     this.#replay = new Replay(options.replaySource, options.registry);
     this.#maxEffects = options.maxEffects;
-    this.#recorder = new Recorder(options.journalSink);
+    this.#recorder = new Recorder(options.journalSink, options.replaySource);
   }
 
   async run(program: BerylxNode, focus: unknown): Promise<Outcome> {
@@ -84,7 +93,11 @@ export class Driver {
 
   #handlersFor(kit: Kit | null, depth: number): Darkcore.AsyncHandlerMap {
     const effects: Darkcore.AsyncHandlerMap = {};
-    for (const tag of [...this.#registry.tags, CLOCK_RANDOM_TAG, PROGRAM_SUBMIT_TAG]) {
+    for (const tag of [
+      ...this.#registry.tags,
+      CLOCK_RANDOM_TAG,
+      PROGRAM_SUBMIT_TAG,
+    ]) {
       effects[tag] = (payload) => this.#gate(tag, payload, kit, depth);
     }
     const syncEffects = this.#syncEffectsFor(kit, depth);
@@ -92,16 +105,26 @@ export class Driver {
     handlers[EffectTree.TASK] = (payload) => {
       const [task, focus] = payload as [Task | AsyncTask, Focus];
       if (task instanceof AsyncTask) {
-        return task.callAsync(focus, task.effectful() ? new Perform(handlers) : undefined);
+        return task.callAsync(
+          focus,
+          task.effectful() ? new Perform(handlers) : undefined,
+        );
       }
-      return task.call(focus, task.effectful() ? new Perform(syncEffects) : undefined);
+      return task.call(
+        focus,
+        task.effectful() ? new Perform(syncEffects) : undefined,
+      );
     };
     return handlers;
   }
 
   #syncEffectsFor(kit: Kit | null, depth: number): Darkcore.HandlerMap {
     const effects: Darkcore.HandlerMap = {};
-    for (const tag of [...this.#registry.tags, CLOCK_RANDOM_TAG, PROGRAM_SUBMIT_TAG]) {
+    for (const tag of [
+      ...this.#registry.tags,
+      CLOCK_RANDOM_TAG,
+      PROGRAM_SUBMIT_TAG,
+    ]) {
       effects[tag] = (payload) => {
         if (this.#asynchronous(tag, payload)) {
           throw new Error(
@@ -125,12 +148,19 @@ export class Driver {
   }
 
   #asynchronous(tag: string, payload: unknown): boolean {
-    if (tag === PROGRAM_SUBMIT_TAG) return this.#submission.containsAsyncTask(payload);
+    if (tag === PROGRAM_SUBMIT_TAG)
+      return this.#submission.containsAsyncTask(payload);
     if (tag === CLOCK_RANDOM_TAG) return false;
     return this.#registry.forTag(tag).operationFor(tag).asynchronous;
   }
 
-  #gate(tag: string, rawPayload: unknown, kit: Kit | null, depth: number): unknown | Promise<unknown> {
+  #gate(
+    tag: string,
+    rawPayload: unknown,
+    kit: Kit | null,
+    depth: number,
+  ): unknown | Promise<unknown> {
+    this.#replay.assertActive();
     const payload = normalizeJson(rawPayload);
     const [tick, verdict] = this.#admit(tag, payload, kit);
     if (verdict.denied) return this.#deny(tick, tag, payload, verdict);
@@ -138,9 +168,11 @@ export class Driver {
     try {
       const obtained = this.#obtain(tick, tag, payload, kit, depth);
       if (promiseLike<Obtained>(obtained)) {
-        return obtained.then((settled) => this.#commit(tick, tag, payload, verdict, settled)).catch(
-          (error: unknown) => this.#fail(tick, tag, payload, verdict, error),
-        );
+        return obtained
+          .then((settled) => this.#commit(tick, tag, payload, verdict, settled))
+          .catch((error: unknown) =>
+            this.#fail(tick, tag, payload, verdict, error),
+          );
       }
       return this.#commit(tick, tag, payload, verdict, obtained);
     } catch (error) {
@@ -149,8 +181,13 @@ export class Driver {
   }
 
   /** This synchronous section is the bookkeeping lock in the single-threaded JS runtime. */
-  #admit(tag: string, payload: JsonValue, kit: Kit | null): readonly [Tick, VerdictValue] {
-    if (this.#maxEffects !== null && this.#processed >= this.#maxEffects) throw new Suspend();
+  #admit(
+    tag: string,
+    payload: JsonValue,
+    kit: Kit | null,
+  ): readonly [Tick, VerdictValue] {
+    if (this.#maxEffects !== null && this.#processed >= this.#maxEffects)
+      throw new Suspend();
     const tick = this.#clock.advance();
     const verdict = this.#authority.judge(new Request(tag, payload), kit);
     if (!verdict.denied) this.#processed += 1;
@@ -165,10 +202,11 @@ export class Driver {
     depth: number,
   ): Obtained | Promise<Obtained> {
     if (tag === CLOCK_RANDOM_TAG) return this.#obtainRandom(tick, payload);
-    if (tag === PROGRAM_SUBMIT_TAG) return this.#obtainSubmit(payload, kit, depth);
+    if (tag === PROGRAM_SUBMIT_TAG)
+      return this.#obtainSubmit(payload, kit, depth);
     if (!this.#replay.exhausted) {
-      const [value, recorded] = this.#replay.readBack(tag, payload);
-      return [value, recorded, true] as const;
+      const [value, recorded] = this.#replay.readBack(tag, payload, tick.index);
+      return this.#replay.defer(tick.index, [value, recorded, true] as const);
     }
     return this.#callExternal(tag, payload);
   }
@@ -176,36 +214,61 @@ export class Driver {
   #callExternal(tag: string, payload: unknown): Obtained | Promise<Obtained> {
     // Execution begins only after admission and runs outside every bookkeeping section.
     const value = this.#real[tag]?.(payload);
-    if (!(tag in this.#real)) throw new Error(`no real handler for effect: ${tag}`);
+    if (!(tag in this.#real))
+      throw new Error(`no real handler for effect: ${tag}`);
     if (promiseLike(value)) {
-      return value.then((settled) => [settled, normalizeJson(settled), true] as const);
+      return value.then(
+        (settled) => [settled, normalizeJson(settled), true] as const,
+      );
     }
     return [value, normalizeJson(value), true] as const;
   }
 
-  #obtainSubmit(payload: unknown, kit: Kit | null, depth: number): Obtained | Promise<Obtained> {
+  #obtainSubmit(
+    payload: unknown,
+    kit: Kit | null,
+    depth: number,
+  ): Obtained | Promise<Obtained> {
     if (depth >= Driver.MAX_SUBMIT_DEPTH) {
-      throw new TooDeep(`submit nesting exceeded the limit of ${Driver.MAX_SUBMIT_DEPTH}`);
+      throw new TooDeep(
+        `submit nesting exceeded the limit of ${Driver.MAX_SUBMIT_DEPTH}`,
+      );
     }
     const childKit = kit?.descend() ?? null;
     const produced = this.#submission.run(payload, (task, focus) =>
-      this.#foldChild(task, childKit === null ? focus : focusWithKit(focus, childKit), childKit, depth + 1),
+      this.#foldChild(
+        task,
+        childKit === null ? focus : focusWithKit(focus, childKit),
+        childKit,
+        depth + 1,
+      ),
     );
     if (promiseLike(produced)) {
-      return produced.then((value) => [value, normalizeJson(value), false] as const);
+      return produced.then(
+        (value) => [value, normalizeJson(value), false] as const,
+      );
     }
     return [produced, normalizeJson(produced), false] as const;
   }
 
   #obtainRandom(tick: Tick, payload: unknown): Obtained {
     const checked = ClockRandomPayload.safeParse(payload);
-    if (!checked.success) throw new Error(`invalid clock_random payload: ${checked.error.message}`);
-    if (checked.data.bound <= 0) throw new Error('clock_random bound must be a positive integer');
-    const recorded = { value: this.#clock.rngFor(tick).nextInt(checked.data.bound) };
+    if (!checked.success)
+      throw new Error(`invalid clock_random payload: ${checked.error.message}`);
+    if (checked.data.bound <= 0)
+      throw new Error("clock_random bound must be a positive integer");
+    const recorded = {
+      value: this.#clock.rngFor(tick).nextInt(checked.data.bound),
+    };
     return [recorded, recorded, false] as const;
   }
 
-  #fold(program: BerylxNode, focus: unknown, kit: Kit | null, depth: number): Promise<Result> {
+  #fold(
+    program: BerylxNode,
+    focus: unknown,
+    kit: Kit | null,
+    depth: number,
+  ): Promise<Result> {
     return EffectTree.runAsync(program, focus, this.#handlersFor(kit, depth));
   }
 
@@ -215,7 +278,9 @@ export class Driver {
     kit: Kit | null,
     depth: number,
   ): Result | Promise<Result> {
-    const asynchronous = program.nodes().some((node) => node instanceof AsyncTask);
+    const asynchronous = program
+      .nodes()
+      .some((node) => node instanceof AsyncTask);
     if (asynchronous) return this.#fold(program, focus, kit, depth);
     return EffectTree.run(program, focus, this.#syncHandlersFor(kit, depth));
   }
@@ -227,16 +292,20 @@ export class Driver {
     verdict: VerdictValue,
     obtained: Obtained,
   ): unknown {
-    const [value, recorded, external] = obtained;
-    this.#recorder.effect({
-      tick: tick.index,
-      tag,
-      payload,
-      recorded,
-      verdict,
-      external,
-    });
-    return value;
+    try {
+      const [value, recorded, external] = obtained;
+      this.#recorder.effect({
+        tick: tick.index,
+        tag,
+        payload,
+        recorded,
+        verdict,
+        external,
+      });
+      return value;
+    } finally {
+      this.#replay.complete(tick.index);
+    }
   }
 
   #fail(
@@ -251,12 +320,7 @@ export class Driver {
     throw error;
   }
 
-  #deny(
-    tick: Tick,
-    tag: string,
-    payload: unknown,
-    verdict: Denied,
-  ): never {
+  #deny(tick: Tick, tag: string, payload: unknown, verdict: Denied): never {
     this.#recorder.denial({ tick: tick.index, tag, payload, verdict });
     throw new AdmissionDenied(verdict);
   }
