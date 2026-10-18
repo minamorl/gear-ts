@@ -1,4 +1,5 @@
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readlinkSync,
@@ -29,6 +30,8 @@ import { FileStore } from "../src/machine/store.js";
 import { JournalAppendMismatch } from "../src/machine/store.js";
 import { withFileLock } from "../src/machine/file-lock.js";
 import type { Registry as PortRegistry } from "../src/port/core.js";
+
+mkdirSync(join(process.cwd(), ".core-reliability-logs"), { recursive: true });
 
 const registry = {
   forTag: () => ({ operationFor: () => ({ resultSchema: z.number() }) }),
