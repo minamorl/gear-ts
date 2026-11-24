@@ -175,5 +175,6 @@ export {
   TimeNow,
   SHELL_RUN_TAG,
   HTTP_REQUEST_TAG,
+  HTTP_OBSERVE_TAG,
   TIME_NOW_TAG,
 } from './port/index.js';
