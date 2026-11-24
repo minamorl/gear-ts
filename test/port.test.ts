@@ -1,14 +1,17 @@
 import { createServer } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { Darkcore } from '@minamorl/berylx';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {
   CLOCK_RANDOM_TAG,
   HTTP_REQUEST_TAG,
+  HTTP_OBSERVE_TAG,
   HttpAdapter,
   Port,
   PortAdapter,
   PortRegistry,
+  Receipt,
   SHELL_RUN_TAG,
   ShellAdapter,
   TIME_NOW_TAG,
@@ -279,5 +282,253 @@ describe('Port', () => {
         server.close((error) => (error ? reject(error) : resolve())),
       );
     }
+  });
+
+  it('observes a written POST, a truncated body, and a complete response without retrying', async () => {
+    const received: string[] = [];
+    const server = createServer((request, response) => {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => { body += chunk; });
+      request.on('end', () => {
+        received.push(`${request.url}:${body}`);
+        if (request.url === '/unknown') {
+          request.socket.destroy();
+        } else if (request.url === '/truncated') {
+          response.writeHead(202, { 'content-type': 'text/plain', 'content-length': '100' });
+          response.write('partial');
+          setTimeout(() => response.destroy(), 20);
+        } else if (request.url === '/misdirected') {
+          response.writeHead(421);
+          response.end('misdirected');
+        } else if (request.url === '/encoded') {
+          response.writeHead(200, { 'content-encoding': 'gzip' });
+          response.end('encoded');
+        } else if (request.url === '/transfer-encoded') {
+          response.writeHead(200, { 'transfer-encoding': 'gzip, chunked' });
+          response.end('encoded');
+        } else if (request.url === '/not-modified') {
+          response.writeHead(304, { 'content-encoding': 'gzip' });
+          response.end();
+        } else if (request.url === '/reset-content') {
+          response.writeHead(205, { 'content-encoding': 'gzip', 'content-length': '0' });
+          response.end();
+        } else {
+          response.writeHead(201, { 'content-type': 'text/plain' });
+          response.end('created');
+        }
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      for (const [path, kind] of [['unknown', 'unknown'], ['truncated', 'body_unreadable'], ['ok', 'response'], ['misdirected', 'response']] as const) {
+        const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+          method: 'POST', url: `http://127.0.0.1:${address.port}/${path}`, body: 'write',
+        });
+        const result = await Darkcore.runAsync(effect, HttpAdapter.realHandlers());
+        expect(result).toMatchObject({ kind });
+        if (path === 'truncated') expect(result).toMatchObject({ status: 202, headers: { 'content-type': 'text/plain' } });
+        if (path === 'ok') expect(result).toMatchObject({ response: { status: 201, body: 'created' } });
+        if (path === 'misdirected') expect(result).toMatchObject({ response: { status: 421, body: 'misdirected' } });
+        const receipt = Receipt.issue({ effect, outcome: Receipt.ok(result), grounds: null, tick: 1 });
+        expect(Receipt.fromJSON(receipt.serialize()).outcome).toEqual(Receipt.ok(result));
+      }
+      expect(received).toEqual(['/unknown:write', '/truncated:write', '/ok:write', '/misdirected:write']);
+      const deletion = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+        method: 'DELETE', url: `http://127.0.0.1:${address.port}/delete`, body: 'write',
+      });
+      expect(await Darkcore.runAsync(deletion, HttpAdapter.realHandlers())).toMatchObject({ kind: 'response' });
+      expect(received.at(-1)).toBe('/delete:write');
+      const encoded = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+        method: 'GET', url: `http://127.0.0.1:${address.port}/encoded`,
+      });
+      expect(await Darkcore.runAsync(encoded, HttpAdapter.realHandlers())).toMatchObject({
+        kind: 'body_unreadable', status: 200, headers: { 'content-encoding': 'gzip' },
+      });
+      const transferEncoded = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+        method: 'GET', url: `http://127.0.0.1:${address.port}/transfer-encoded`,
+      });
+      expect(await Darkcore.runAsync(transferEncoded, HttpAdapter.realHandlers())).toMatchObject({
+        kind: 'body_unreadable', status: 200, headers: { 'transfer-encoding': 'gzip, chunked' },
+      });
+      for (const [method, path, status] of [['HEAD', 'encoded', 200], ['GET', 'not-modified', 304], ['POST', 'reset-content', 205]] as const) {
+        const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, { method, url: `http://127.0.0.1:${address.port}/${path}` });
+        expect(await Darkcore.runAsync(effect, HttpAdapter.realHandlers())).toMatchObject({
+          kind: 'response', response: { status, body: '', headers: { 'content-encoding': 'gzip' } },
+        });
+      }
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('rejects GET and HEAD bodies before sending and combines case-insensitive headers in order', async () => {
+    const received: Array<{ method: string | undefined; accept: string | undefined }> = [];
+    const server = createServer((request, response) => {
+      received.push({ method: request.method, accept: request.headers.accept });
+      response.writeHead(200);
+      response.end('ok');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      const url = `http://127.0.0.1:${address.port}/`;
+      for (const method of ['GET', 'HEAD'] as const) {
+        for (const body of ['', 'write']) {
+          const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, { method, url, body });
+          expect(await Darkcore.runAsync(effect, HttpAdapter.realHandlers())).toEqual({ kind: 'unknown' });
+        }
+      }
+      expect(received).toEqual([]);
+      for (const method of ['GET', 'HEAD'] as const) {
+        const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+          method, url, headers: { Accept: 'application/json', accept: 'text/plain' },
+        });
+        expect(await Darkcore.runAsync(effect, HttpAdapter.realHandlers())).toMatchObject({ kind: 'response' });
+      }
+      expect(received).toEqual([
+        { method: 'GET', accept: 'application/json, text/plain' },
+        { method: 'HEAD', accept: 'application/json, text/plain' },
+      ]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('matches request body content type and UTF-8 BOM handling, and rejects URL credentials before sending', async () => {
+    const received: Array<{ body: string; contentType: string | undefined }> = [];
+    const server = createServer((request, response) => {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => { body += chunk; });
+      request.on('end', () => {
+        received.push({ body, contentType: request.headers['content-type'] });
+        response.writeHead(202, { 'content-type': 'application/json' });
+        response.end(Buffer.from('\ufeff{"ok":true}', 'utf8'));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      const url = `http://127.0.0.1:${address.port}/`;
+      const rejected = HttpAdapter.effect(HTTP_OBSERVE_TAG, { method: 'POST', url: `http://user:password@127.0.0.1:${address.port}/`, body: 'write' });
+      expect(await Darkcore.runAsync(rejected, HttpAdapter.realHandlers())).toEqual({ kind: 'unknown' });
+      expect(received).toEqual([]);
+      for (const [body, headers, expectedType] of [
+        ['write', undefined, 'text/plain;charset=UTF-8'],
+        ['', undefined, 'text/plain;charset=UTF-8'],
+        ['write', { 'CoNtEnT-TyPe': 'application/custom' }, 'application/custom'],
+        ['write', { 'CONTENT-TYPE': '' }, ''],
+      ] as const) {
+        const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, { method: 'POST', url, body, ...(headers ? { headers } : {}) });
+        const result = Port.HttpObservation.parse(await Darkcore.runAsync(effect, HttpAdapter.realHandlers()));
+        expect(result).toMatchObject({ kind: 'response', response: { status: 202, body: '{"ok":true}' } });
+        if (result.kind === 'response') expect(JSON.parse(result.response.body)).toEqual({ ok: true });
+        expect(received.at(-1)).toEqual({ body, contentType: expectedType });
+      }
+      expect(received).toHaveLength(4);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('negotiates identity by default and preserves explicit accept-encoding', async () => {
+    const received: Array<{ encoding: string | undefined; body: string }> = [];
+    const server = createServer((request, response) => {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => { body += chunk; });
+      request.on('end', () => {
+        const encoding = request.headers['accept-encoding'];
+        received.push({ encoding, body });
+        if (encoding === 'identity' || encoding === '') {
+          response.writeHead(201);
+          response.end('created');
+        } else {
+          response.writeHead(201, { 'content-encoding': 'gzip' });
+          response.end(gzipSync('created'));
+        }
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      for (const [headers, kind] of [[undefined, 'response'], [{ 'AcCePt-EnCoDiNg': 'gzip' }, 'body_unreadable'], [{ 'ACCEPT-ENCODING': '' }, 'response']] as const) {
+        const payload = { method: 'POST', url: `http://127.0.0.1:${address.port}/`, body: 'write', ...(headers ? { headers } : {}) };
+        const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, payload);
+        expect(effect.payload).toEqual(payload);
+        const result = await Darkcore.runAsync(effect, HttpAdapter.realHandlers());
+        expect(result).toMatchObject(kind === 'response'
+          ? { kind, response: { status: 201, body: 'created' } }
+          : { kind, status: 201, headers: { 'content-encoding': 'gzip' } });
+      }
+      expect(received).toEqual([
+        { encoding: 'identity', body: 'write' },
+        { encoding: 'gzip', body: 'write' },
+        { encoding: '', body: 'write' },
+      ]);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('closes an unsupported encoded response without draining an endless body', async () => {
+    let closed!: () => void;
+    const disconnected = new Promise<void>((resolve) => { closed = resolve; });
+    const server = createServer((_request, response) => {
+      response.on('close', closed);
+      response.writeHead(200, { 'content-encoding': 'gzip' });
+      response.write('incomplete');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, { method: 'GET', url: `http://127.0.0.1:${address.port}/` });
+      expect(await Darkcore.runAsync(effect, HttpAdapter.realHandlers())).toMatchObject({ kind: 'body_unreadable' });
+      await disconnected;
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('resolves a protocol upgrade as the observed 101 response', async () => {
+    const server = createServer();
+    server.on('upgrade', (_request, socket) => {
+      socket.end('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: example\r\n\r\n');
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('local server did not bind');
+    try {
+      const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+        method: 'GET', url: `http://127.0.0.1:${address.port}/`, headers: { connection: 'Upgrade', upgrade: 'example' },
+      });
+      expect(await Darkcore.runAsync(effect, HttpAdapter.realHandlers())).toMatchObject({
+        kind: 'response', response: { status: 101, headers: { upgrade: 'example' }, body: '' },
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+
+  it('preserves custom fetch injection and legacy rejection', async () => {
+    const error = new Error('transport');
+    const adapter = Port.buildHttpAdapter(async () => { throw error; });
+    const payload = { method: 'POST', url: 'http://example.test/', body: 'x' };
+    await expect(Darkcore.runAsync(adapter.effect(HTTP_REQUEST_TAG, payload), adapter.realHandlers())).rejects.toBe(error);
+    await expect(Darkcore.runAsync(adapter.effect(HTTP_OBSERVE_TAG, payload), adapter.realHandlers())).resolves.toEqual({ kind: 'unknown' });
+    const fake = adapter.handlers(() => ({ kind: 'unknown' }));
+    await expect(Darkcore.runAsync(adapter.effect(HTTP_OBSERVE_TAG, payload), fake)).resolves.toEqual({ kind: 'unknown' });
   });
 });

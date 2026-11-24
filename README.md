@@ -200,3 +200,59 @@ See [the release guide](https://github.com/minamorl/gear-ts/blob/main/.github/RE
 ## License
 
 [MIT](LICENSE).
+
+# Observing HTTP outcomes
+
+Use `http_observe` when a caller must distinguish a received response from an
+unobserved response. It uses the same payload and adapter as `http_request`;
+the latter keeps its existing result and rejection behavior. An `unknown`
+result includes failures before a response is observed, including an invalid URL:
+it does not claim that a request was sent or that the remote operation
+was not applied. No retry is performed. A `body_unreadable` result retains the
+observed status and headers, but does not claim the remote operation succeeded.
+Payloads that fail the schema, such as an unsupported method, raise
+`InvalidPayload` before the request is run.
+
+```ts
+import { Darkcore } from "@minamorl/berylx";
+import { HttpAdapter, HTTP_OBSERVE_TAG, Port } from "@minamorl/gear";
+
+const effect = HttpAdapter.effect(HTTP_OBSERVE_TAG, {
+  method: "POST",
+  url: "https://example.com/orders",
+  body: '{"id":"123"}',
+});
+const observation = Port.HttpObservation.parse(
+  await Darkcore.runAsync(effect, HttpAdapter.realHandlers()),
+);
+switch (observation.kind) {
+  case "unknown":
+    // Reconcile order 123 with the remote system before deciding what to do.
+    break;
+  case "body_unreadable":
+    console.log(observation.status, observation.headers);
+    break;
+  case "response":
+    console.log(observation.response);
+    break;
+  default: {
+    const exhaustive: never = observation;
+    throw new Error(`Unexpected observation: ${exhaustive}`);
+  }
+}
+```
+
+RFC 9110 §9.2.2 cautions against retrying non-idempotent requests without
+additional knowledge. Effect's retry schedules choose when to run an effect
+again; this operation instead reports what was observed and leaves that choice
+to the caller. The built-in observation transport uses Node HTTP(S), sends
+`Accept-Encoding: identity` unless the caller specifies that header, does not
+follow redirects, and reports non-identity content encodings and transfer
+encodings other than chunked as unreadable. An
+injected custom fetch controls its own retry and redirect behavior; callers must
+ensure it does not retry if they require single-attempt semantics. Temporal asynchronous Activity completion uses an external
+completion signal and identifier; this observation does not supply that protocol
+or resolve an unknown outcome. See [RFC 9110 §9.2.2](https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2),
+the [Fetch Standard](https://fetch.spec.whatwg.org/#fetch-method),
+[Effect scheduling](https://effect.website/docs/v3/scheduling/introduction), and
+[Temporal asynchronous completion](https://docs.temporal.io/develop/typescript/activities/asynchronous-activity).
